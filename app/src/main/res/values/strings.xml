@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">AI Knowledge Feed</string>
+    <string name="screen_feed">Feed</string>
+    <string name="screen_detail">Details</string>
+    <string name="screen_knowledge">Wissensbasis</string>
+    <string name="screen_settings">Einstellungen</string>
+</resources>
