@@ -39,7 +39,7 @@ All explanations are abstract-based. The LLM receives only the paper abstract, b
 .venv/bin/python -m pytest -q
 ```
 
-24 tests passed at integration review, including PDF/consent, authentication, concept state/deduplication/deletion, provider failures, source dedupe, daily reuse/concurrency/retry and full PDF-to-next-day knowledge reuse. Tests use HTTP/model doubles, not paid APIs. A successful mock test is not proof of provider balance, live source availability or scientific correctness.
+26 tests passed at integration review, including PDF/consent, authentication, concept state/deduplication/deletion, provider failures, source dedupe, daily reuse/concurrency/retry and full PDF-to-next-day knowledge reuse. Tests use HTTP/model doubles, not paid APIs. A successful mock test is not proof of provider balance, live source availability or scientific correctness.
 
 Known limits: no OCR, embeddings, full-paper analysis or independent fact checker. JSON/ID validation prevents invalid references but cannot prove a model's scientific claims. English/German keyword mismatch can reduce retrieval quality. Source schema/quotas may change; current official sources checked: https://help.openalex.org/api/ , https://help.openalex.org/api/authentication/ , https://info.arxiv.org/help/api/user-manual.html and https://info.arxiv.org/help/api/tou.html . No scheduled background daemon: the app requests its daily issue when opened. This is a protected single-user service; multi-user identity/tenant isolation is not implemented.
 
