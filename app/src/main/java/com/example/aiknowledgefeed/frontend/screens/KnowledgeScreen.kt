@@ -50,6 +50,7 @@ fun KnowledgeScreen(
     onDiscover: () -> Unit,
     onReset: () -> Unit,
     modifier: Modifier = Modifier,
+    live: Boolean = false,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var selectedCategory by rememberSaveable { mutableStateOf<DemoCategory?>(null) }
@@ -133,9 +134,9 @@ fun KnowledgeScreen(
         }
         item(key = "footer") {
             Column(Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Demo-Sammlung · Änderungen werden nicht dauerhaft gespeichert.",
+                Text(if (live) "Dein bestätigtes Wissen · mit Originalquellen gespeichert." else "Demo-Sammlung · Änderungen werden nicht dauerhaft gespeichert.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TextButton(onClick = { onReset(); query = ""; selectedCategory = null }) {
+                if (!live) TextButton(onClick = { onReset(); query = ""; selectedCategory = null }) {
                     Text("Demo-Sammlung zurücksetzen")
                 }
             }
@@ -158,7 +159,7 @@ private fun KnowledgeCard(
                 Box(Modifier.weight(1f)) { CategoryLabel(topic.category) }
                 Spacer(Modifier.width(8.dp))
                 IconButton(onClick = onRemove) {
-                    Icon(PaperIcons.Close, "${topic.title} aus der Demo-Sammlung entfernen",
+                    Icon(PaperIcons.Close, "${topic.title} aus der Wissenssammlung entfernen",
                         Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -173,7 +174,7 @@ private fun KnowledgeCard(
             TopicTags(topic.connections)
             topic.articleId?.let { articleId ->
                 TextButton(onClick = { onOpenArticle(articleId) }) {
-                    Text("Demo-Beitrag erneut lesen")
+                    Text("Quelle und Erklärung erneut lesen")
                     Spacer(Modifier.width(8.dp))
                     Icon(PaperIcons.Arrow, null, Modifier.size(18.dp))
                 }

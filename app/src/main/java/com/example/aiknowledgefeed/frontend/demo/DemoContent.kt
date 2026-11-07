@@ -21,6 +21,9 @@ data class DemoArticle(
     val takeaway: String,
     val readingMinutes: Int = 3,
     val date: String = "06. November 2026",
+    val sourceUrl: String = "",
+    val abstractBased: Boolean = false,
+    val isDemo: Boolean = true,
 )
 
 data class DemoKnowledge(

@@ -42,12 +42,12 @@ fun BrandHeader(darkTheme: Boolean, onToggleTheme: () -> Unit, modifier: Modifie
         Column(Modifier.weight(1f)) {
             Text("PaperView", style = if (largeText) MaterialTheme.typography.titleMedium
                 else MaterialTheme.typography.titleLarge)
-            if (largeText) Text("DEMO", style = MaterialTheme.typography.labelSmall,
+            if (largeText) Text("WISSEN", style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (!largeText) {
             Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = CircleShape) {
-                Text("DEMO", Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                Text("WISSEN", Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -97,7 +97,7 @@ fun KnowledgeConnection(
     topics: List<String>,
     modifier: Modifier = Modifier,
     explanation: String? = null,
-    title: String = "Verknüpft mit deinem Wissen",
+    title: String = if (topics.isEmpty()) "Noch keine direkte Wissensverbindung" else "Verknüpft mit deinem Wissen",
 ) {
     Surface(modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.primaryContainer) {

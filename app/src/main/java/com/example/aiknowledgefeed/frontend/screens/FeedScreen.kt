@@ -49,10 +49,12 @@ fun FeedScreen(
     onToggleTheme: () -> Unit,
     onOpenArticle: (String) -> Unit,
     modifier: Modifier = Modifier,
+    sourceArticles: List<DemoArticle> = DemoContent.articles,
+    live: Boolean = false,
 ) {
     val largeText = LocalDensity.current.fontScale > 1.2f
     var selectedCategory by rememberSaveable { mutableStateOf<DemoCategory?>(null) }
-    val articles = DemoContent.articles.filter { selectedCategory == null || it.category == selectedCategory }
+    val articles = sourceArticles.filter { selectedCategory == null || it.category == selectedCategory }
 
     LazyColumn(modifier, contentPadding = PaddingValues(bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -72,7 +74,7 @@ fun FeedScreen(
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text("Dein Wissen ist der Anfang.", style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer)
-                            Text("$knowledgeCount Themen in deiner Demo-Sammlung",
+                            Text("$knowledgeCount Themen in deiner Sammlung",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer)
                         }
@@ -82,7 +84,7 @@ fun FeedScreen(
                         }
                     }
                 }
-                DemoNotice()
+                if (!live) DemoNotice()
             }
         }
         item(key = "filters") {
@@ -101,6 +103,7 @@ fun FeedScreen(
             NewsCard(article, index == 0, article.id in savedArticleIds,
                 onClick = { onOpenArticle(article.id) }, modifier = Modifier.padding(horizontal = 24.dp))
         }
+        if (articles.isEmpty()) item { Text("Noch keine passenden Veröffentlichungen. Prüfe dein Wissensprofil und die Einstellungen.", Modifier.padding(24.dp)) }
         item(key = "footer") {
             Text("Ein neuer Gedanke beginnt oft mit etwas, das du schon kennst.",
                 Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
@@ -133,7 +136,7 @@ private fun NewsCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             KnowledgeConnection(article.priorKnowledge)
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("06. Nov. · ${article.readingMinutes} Min. · Demo",
+                Text("${article.date} · ${if (article.sourceUrl.isNotEmpty()) runCatching { java.net.URI(article.sourceUrl).host }.getOrDefault("") else ""} · ${if (article.isDemo) "Demo" else if (article.abstractBased) "Abstractbasiert" else "Paper"}",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
                 Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.surfaceContainer) {
