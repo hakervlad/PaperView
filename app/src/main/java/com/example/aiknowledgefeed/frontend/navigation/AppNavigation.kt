@@ -57,7 +57,7 @@ fun AppNavigation(darkTheme: Boolean, onToggleTheme: () -> Unit, modifier: Modif
     val vm: com.example.aiknowledgefeed.frontend.viewmodels.PaperViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val state by vm.state.collectAsStateWithLifecycle()
     androidx.lifecycle.compose.LifecycleResumeEffect(vm) { vm.refresh(); onPauseOrDispose { } }
-    val knowledge = state.data.knowledge.filter { it.status == "confirmed" }.map { it.asCard() }
+    val knowledge = state.data.knowledge.filter { it.status == "confirmed" }.map { concept -> concept.asCard().copy(connections = concept.connections.mapNotNull { id -> state.data.knowledge.firstOrNull { it.id == id }?.name }) }
     val articles = state.data.feed.items.map { it.asArticle() }
     val savedArticleIds = knowledge.mapNotNull { it.articleId }.toSet()
     // Dient nur der passenden Tab-Markierung auf der Detailseite.

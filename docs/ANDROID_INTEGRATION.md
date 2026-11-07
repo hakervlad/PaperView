@@ -38,3 +38,15 @@ Live paid model calls require operator/user credentials and adequate provider ba
 ## Android checkpoint (2026-11-07)
 
 Executed `:app:assembleDebug :app:testDebugUnitTest :app:lintDebug` with the existing Gradle 9.6.0/AGP 9.5.1 configuration, temporary JDK 21 and SDK 35: BUILD SUCCESSFUL. Nine unit tests passed, zero failures/errors. Lint has no blocking errors; dependency/target/deprecated custom-check warnings remain. Scientific UI mapping tests preserve the paper ID, source URL, abstract-only marker and actual supplied prior concepts, and do not substitute demo knowledge. Backend integration and emulator end-to-end verification are still pending; issue #1 remains open.
+
+
+## Integrated verification (2026-11-07)
+
+- Backend implementation merged via PR #2 into `feat/backend-integration`. Manager review corrected the authenticated OpenAPI endpoint, 10-MB upload limit, personalized understood takeaways and links, profile-topic search and safe token comparison. An early Content-Length guard now rejects oversized/unknown-size PDF uploads before multipart parsing.
+- `pytest -q`: **24 passed**. Added absent-knowledge, profile-dependent context, provider URL/SSRF allowlist and full PDF-to-next-day knowledge reuse coverage.
+- `PAPERVIEW_INTEGRATION_URL=http://127.0.0.1:8000/ ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug`: **BUILD SUCCESSFUL**, **10 tests passed, zero skipped**, zero lint errors. These include 9 Android unit tests and one opt-in integration test using the actual Retrofit client over a real HTTP socket to FastAPI with explicit mock providers.
+- Actual HTTP flow verified: profile save, PDF upload/extraction, separate consent, candidate correction/confirmation, personalized abstract-grounded feed, understood takeaway/links, idempotent save, next-day inclusion of the new concept in model input, document/knowledge deletion. Model call captures proved the second context contained the newly stored concept ID.
+- The local production app factory was also started separately on loopback; private endpoints require authentication.
+- No valid LLM_API_KEY was configured in this environment. **No real paid KI/model call was performed.** Neither live source availability nor scientific correctness is established by provider doubles.
+- **APK-on-device end-to-end verification remains OPEN**: both emulator starts failed inside the emulator's QEMU runtime with hanging CPU/main-loop threads and exit 139. This is not an app crash report. SAF UI, Keystore encryption/decryption and persistent cache behavior on a real Android device still require device verification. The previously successful frontend-only emulator test does not validate these new functions.
+- Issue #1 must remain open until those device acceptance checks are completed. No claim of full acceptance is made by merging the code.

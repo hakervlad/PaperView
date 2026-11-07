@@ -39,6 +39,19 @@ All explanations are abstract-based. The LLM receives only the paper abstract, b
 .venv/bin/python -m pytest -q
 ```
 
-18 tests passed at integration review, including PDF/consent, authentication, concept state/deduplication/deletion, provider failures, source dedupe, daily reuse/concurrency/retry and full PDF-to-next-day knowledge reuse. Tests use HTTP/model doubles, not paid APIs. A successful mock test is not proof of provider balance, live source availability or scientific correctness.
+24 tests passed at integration review, including PDF/consent, authentication, concept state/deduplication/deletion, provider failures, source dedupe, daily reuse/concurrency/retry and full PDF-to-next-day knowledge reuse. Tests use HTTP/model doubles, not paid APIs. A successful mock test is not proof of provider balance, live source availability or scientific correctness.
 
 Known limits: no OCR, embeddings, full-paper analysis or independent fact checker. JSON/ID validation prevents invalid references but cannot prove a model's scientific claims. English/German keyword mismatch can reduce retrieval quality. Source schema/quotas may change; current official sources checked: https://help.openalex.org/api/ , https://help.openalex.org/api/authentication/ , https://info.arxiv.org/help/api/user-manual.html and https://info.arxiv.org/help/api/tou.html . No scheduled background daemon: the app requests its daily issue when opened. This is a protected single-user service; multi-user identity/tenant isolation is not implemented.
+
+
+## Reproducible real-HTTP integration (mock providers)
+
+This test factory is isolated under `tests/`, requires an explicit flag and binds to loopback. It must never be deployed as the production service. Its public fixture token is intentionally not a real secret. Use a **fresh temporary directory** for each run.
+
+```sh
+PAPERVIEW_TEST_SERVER=1 PAPERVIEW_DATA_DIR=/tmp/paperview-test-new PYTHONPATH=backend:backend/tests backend/.venv/bin/python -m uvicorn mock_server:create_mock_app --factory --host 127.0.0.1 --port 8000 --no-access-log --no-proxy-headers
+# From the root project, in another terminal:
+PAPERVIEW_INTEGRATION_URL=http://127.0.0.1:8000/ ./gradlew :app:testDebugUnitTest --rerun-tasks
+```
+
+The integration test instantiates the actual Android Retrofit interface and Gson DTOs, crosses a real HTTP socket, uploads a text PDF, confirms extracted knowledge, generates a personalized issue, saves its takeaway, advances the test clock and verifies that the new knowledge reaches the next model context. It also tests idempotency, document deletion and knowledge deletion. Without the opt-in environment variable this one test is skipped; the nine unit tests remain independent. This verifies the Android **client**, not APK rendering, SAF interaction, Keystore or DataStore on a device.

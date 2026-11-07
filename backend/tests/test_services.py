@@ -65,3 +65,39 @@ async def test_llm_http(monkeypatch,status,code):
     llm=LLMService(Settings(),httpx.MockTransport(lambda r:httpx.Response(status,json={})))
     with pytest.raises(ServiceError) as e: await llm.complete(('secret','model','https://api.openai.com/v1'),'test',{})
     assert e.value.code==code
+
+@pytest.mark.parametrize('url',['http://api.openai.com/v1','https://localhost/v1','https://api.openai.com:444/v1','https://api.openai.com@127.0.0.1/v1'])
+async def test_provider_url_allowlist(url):
+    from paperview.llm import LLMService
+    from paperview.config import Settings
+    from paperview.errors import ServiceError
+    with pytest.raises(ServiceError) as e:
+        await LLMService(Settings()).complete(('test','model',url),'test',{})
+    assert e.value.code=='provider_forbidden'
+
+async def test_no_prior_connection_is_explicit(tmp_path):
+    from paperview.storage import Store
+    from paperview.knowledge import KnowledgeService
+    from paperview.personalization import Personalizer
+    class Model:
+        async def complete(self,*args):
+            return dict(title='Neue Methode',summary='Noch kein direkter Wissensbezug; zunächst Grundlagen.',concept_ids=[],new_insight='Grundlagen aus dem Abstract.',connection='',relevance='Einführung',takeaway='Ein neues Thema.')
+    item=await Personalizer(KnowledgeService(Store(tmp_path)),Model()).explain(paper(),Profile(),None)
+    assert item.prior_knowledge==[] and item.connection=='' and item.title=='Neue Methode'
+
+async def test_different_confirmed_profiles_produce_different_contexts(tmp_path):
+    from paperview.storage import Store
+    from paperview.knowledge import KnowledgeService
+    from paperview.personalization import Personalizer
+    class ContextModel:
+        async def complete(self, options, instruction, data):
+            known=data['confirmed_knowledge']
+            return dict(summary='Du kennst '+known[0]['name'],concept_ids=[known[0]['id']],new_insight='Testaussage aus Abstract',connection='Verbindung mit '+known[0]['name'],relevance='Testkontext',takeaway='Neue Einsicht')
+    a=KnowledgeService(Store(tmp_path/'a')); b=KnowledgeService(Store(tmp_path/'b'))
+    a.add('Bayes',status='confirmed');b.add('API',status='confirmed')
+    source=paper().model_copy(update={'abstract':'Bayes probability API interfaces'})
+    first=await Personalizer(a,ContextModel()).explain(source,Profile(),None)
+    second=await Personalizer(b,ContextModel()).explain(source,Profile(),None)
+    assert first.summary!=second.summary
+    assert [k.name for k in first.prior_knowledge]==['Bayes']
+    assert [k.name for k in second.prior_knowledge]==['API']

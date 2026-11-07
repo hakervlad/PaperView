@@ -72,6 +72,7 @@ class Concept(Model):
 class Extraction(Model):
     concepts: list[Concept] = Field(max_length=30)
 class Explanation(Model):
+    title: Text | None = None
     summary: Long
     concept_ids: list[str] = Field(max_length=8)
     new_insight: Long

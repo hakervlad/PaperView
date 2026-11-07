@@ -24,6 +24,17 @@ def create_app(settings=None):
     for name,value in locals().copy().items():
         if name in ('settings','store','knowledge','llm','sources','pdf','feed'): setattr(app.state,name,value)
 
+    @app.middleware('http')
+    async def upload_limit(request, call_next):
+        if request.method == 'POST' and request.url.path == '/v1/documents':
+            try:
+                length = int(request.headers.get('content-length', '-1'))
+            except ValueError:
+                length = -1
+            if length < 0 or length > settings.max_upload + 65536:
+                return JSONResponse({'error':{'code':'upload_too_large','message':'PDF-Upload benötigt eine bekannte Größe und darf höchstens 10 MB umfassen.'}},status_code=413)
+        return await call_next(request)
+
     @app.exception_handler(ServiceError)
     async def service_error(request,exc):
         return JSONResponse({'error':{'code':exc.code,'message':exc.message}},status_code=exc.status)
