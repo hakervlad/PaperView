@@ -26,7 +26,6 @@ fun SettingsScreen(vm: PaperViewModel, state: AppState, modifier: Modifier = Mod
     var model by remember(state.settings) { mutableStateOf(state.settings.model) }
     var base by remember(state.settings) { mutableStateOf(state.settings.llmBaseUrl) }
     var apiKeyDraft by remember { mutableStateOf("") }
-    LaunchedEffect(state.settings) { apiKeyDraft = "" }
     val profile = state.data.profile
     var subject by remember(profile) { mutableStateOf(profile.bachelor_subject) }
     var focus by remember(profile) { mutableStateOf(profile.focus_areas.joinToString(", ")) }

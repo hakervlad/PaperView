@@ -146,4 +146,21 @@ class SettingsNavigationRegressionTest {
         compose.onNodeWithText("Mein Wissen").performClick()
         compose.onNodeWithText("MEIN WISSEN · DEINE SAMMLUNG").assertIsDisplayed()
     }
+
+    @Test fun delayedSettingsLoadDoesNotClearAnAlreadyTypedKey() {
+        val gate=kotlinx.coroutines.CompletableDeferred<Unit>()
+        val storage=object:SettingsStorage {
+            var value=Settings(provider="loaded-provider")
+            override suspend fun settings():Settings { gate.await();return value }
+            override suspend fun settings(value:Settings) { this.value=value }
+        }
+        val vm=PaperViewModel(app,SettingsPersistence(storage))
+        compose.setContent { MaterialTheme { AppNavigation(false, {}, vm = vm) } }
+        compose.onNodeWithText("Einstellungen").performClick()
+        compose.onNodeWithText("Eigener API-Key (optional)").performScrollTo().performTextInput("fixture-typed-before-load")
+        gate.complete(Unit)
+        compose.waitUntil(10000) { !vm.state.value.busy }
+        compose.onNodeWithText("Verbindungseinstellungen speichern").performScrollTo().performClick()
+        compose.waitUntil(10000) { vm.state.value.settings.apiKey == "fixture-typed-before-load" }
+    }
 }

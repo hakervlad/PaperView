@@ -18,12 +18,13 @@
 
 Die beiden initialen Regressionstests wurden vor dem Fix auf einem per ADB verbundenen Android-16-Smartphone ausgeführt: **2 Tests, 2 Fehler**. Der lokale Speichertest lief in sein Timeout; der Navigationstest fand die erwartete Wissenssammlung nicht.
 
-Nach dem Fix: **8 Gerätetests, 0 Fehler**:
+Nach dem Fix: **9 Gerätetests, 0 Fehler**:
 
 - Schlüsselfeld ausfüllen/speichern ohne Backend-Konfiguration, Einstellungen verlassen und wieder öffnen.
 - Tatsächlicher Android-Keystore-/DataStore-Roundtrip nach Neuinitialisierung; der Testschlüssel steht nicht im Klartext in der DataStore-Datei. Fehlgeschlagener optionaler Verbindungstest entfernt ihn nicht.
 - Simulierter Schreibfehler wird im UI sichtbar; bisheriger Schlüssel bleibt verfügbar.
 - Speichern wird während eines laufenden initialen Lesevorgangs nicht verworfen.
+- Verzögert geladene Einstellungen löschen keinen bereits im maskierten Feld eingegebenen Schlüssel.
 - Wiederholte Navigation zwischen Entdecken, Wissen und Einstellungen; SavedState-Wiederherstellung.
 - System-Zurück aus Einstellungen zum jeweiligen Ursprung.
 - Tatsächliche MainActivity-Neuerstellung aus Einstellungen und Wissen, anschließend korrekte Navigation.
