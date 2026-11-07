@@ -51,10 +51,11 @@ private const val KnowledgeRoute = "knowledge"
 private const val DetailRoute = "article/{articleId}"
 
 @Composable
-fun AppNavigation(darkTheme: Boolean, onToggleTheme: () -> Unit, modifier: Modifier = Modifier) {
-    val navController = rememberNavController()
+fun AppNavigation(darkTheme: Boolean, onToggleTheme: () -> Unit, modifier: Modifier = Modifier,
+    vm: com.example.aiknowledgefeed.frontend.viewmodels.PaperViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
+    navController: androidx.navigation.NavHostController = rememberNavController(),
+) {
     val backStackEntry by navController.currentBackStackEntryAsState()
-    val vm: com.example.aiknowledgefeed.frontend.viewmodels.PaperViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val state by vm.state.collectAsStateWithLifecycle()
     androidx.lifecycle.compose.LifecycleResumeEffect(vm) { vm.refresh(); onPauseOrDispose { } }
     val knowledge = state.data.knowledge.filter { it.status == "confirmed" }.map { concept -> concept.asCard().copy(connections = concept.connections.mapNotNull { id -> state.data.knowledge.firstOrNull { it.id == id }?.name }) }
@@ -66,8 +67,10 @@ fun AppNavigation(darkTheme: Boolean, onToggleTheme: () -> Unit, modifier: Modif
     val selectedTab = if (route == DetailRoute) detailOrigin else route
 
     fun openTab(target: String) {
-        // Details nicht als gespeicherten Tab-Zustand wiederherstellen.
-        if (navController.currentDestination?.route == DetailRoute) navController.popBackStack()
+        // Unterseiten (Details/Einstellungen) nicht als Haupt-Tab-Zustand speichern.
+        while (navController.currentDestination?.route !in listOf(FeedRoute, KnowledgeRoute)) {
+            if (!navController.popBackStack()) break
+        }
         navController.navigate(target) {
             popUpTo(FeedRoute) { saveState = true }
             launchSingleTop = true

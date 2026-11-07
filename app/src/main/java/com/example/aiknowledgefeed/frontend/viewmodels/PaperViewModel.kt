@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aiknowledgefeed.backend.models.*
 import com.example.aiknowledgefeed.backend.repositories.PaperViewRepository
+import com.example.aiknowledgefeed.backend.services.SettingsPersistence
 import com.example.aiknowledgefeed.backend.services.SecureStore
 import com.google.gson.JsonParser
 import kotlinx.coroutines.*
@@ -14,24 +15,33 @@ import retrofit2.HttpException
 import java.time.LocalDate
 import java.time.ZoneId
 
- data class AppState(val settings: Settings = Settings(), val data: Snapshot = Snapshot(), val busy: Boolean = false, val message: String? = null, val offline: Boolean = false, val extraPaper: Paper? = null)
-class PaperViewModel(application: Application) : AndroidViewModel(application) {
+ data class AppState(val settings: Settings = Settings(), val data: Snapshot = Snapshot(), val busy: Boolean = false, val message: String? = null, val offline: Boolean = false, val extraPaper: Paper? = null, val settingsSaving: Boolean = false)
+class PaperViewModel @JvmOverloads constructor(application: Application,
+    private val settingsPersistence: SettingsPersistence = SettingsPersistence(SecureStore(application)),
+) : AndroidViewModel(application) {
     private val repository = PaperViewRepository(SecureStore(application))
     private val mutable = MutableStateFlow(AppState())
     val state: StateFlow<AppState> = mutable.asStateFlow()
+    private var operationJob: Job? = null
     private var attemptedDay = ""
     private var lastSyncAttempt = 0L
     init { action {
-        val settings = repository.store.settings()
+        val settings = try { settingsPersistence.load() }
+        catch (e: CancellationException) { throw e }
+        catch (_: Exception) {
+            mutable.update { it.copy(message = "Gespeicherte Einstellungen konnten nicht sicher geladen werden. Bitte erneut versuchen.") }
+            return@action
+        }
+        mutable.update { it.copy(settings = settings) }
         val cache = repository.store.snapshot()
         mutable.update { it.copy(settings = settings, data = cache) }
         if (settings.token.isNotBlank()) sync(true)
         else mutable.update { it.copy(message = "Bitte zuerst das Backend in den Einstellungen konfigurieren.") }
     } }
     private fun action(block: suspend () -> Unit) {
-        if (mutable.value.busy) return
+        if (mutable.value.busy || mutable.value.settingsSaving) return
         mutable.update { it.copy(busy = true, message = null) }
-        viewModelScope.launch(Dispatchers.IO) {
+        operationJob = viewModelScope.launch(Dispatchers.IO) {
             try { block() } catch (e: CancellationException) { throw e }
             catch (e: Exception) { mutable.update { it.copy(message = safeError(e), offline = e is java.io.IOException) } }
             finally { mutable.update { it.copy(busy = false) } }
@@ -66,12 +76,32 @@ class PaperViewModel(application: Application) : AndroidViewModel(application) {
         val feed = api().generate(Generation(ZoneId.systemDefault().id))
         persist(mutable.value.data.copy(feed = feed)); mutable.update { it.copy(message = feed.message) }
     }
-    fun configure(settings: Settings) = action {
-        repository.api(settings) // Validate before persisting. No network request.
-        if (settings.backendUrl != mutable.value.settings.backendUrl || settings.token != mutable.value.settings.token) {
-            repository.store.clearCache(); mutable.update { it.copy(data = Snapshot()) }; attemptedDay = ""
+    fun configure(settings: Settings, clearApiKey: Boolean = false): Job? {
+        if (mutable.value.settingsSaving) return null
+        mutable.update { it.copy(settingsSaving = true, message = null) }
+        return viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // Do not discard a save because a refresh is in flight, or let an old
+                // request repopulate cache after the backend identity has changed.
+                operationJob?.cancelAndJoin()
+                val previous = mutable.value.settings
+                val saved = settingsPersistence.save(settings, clearApiKey)
+                mutable.update { it.copy(settings = saved, message = if (saved.apiKey.isNotBlank())
+                    "API-Key gespeichert. Verbindungseinstellungen lokal gespeichert."
+                    else "Verbindungseinstellungen lokal gespeichert.") }
+                if (saved.backendUrl != previous.backendUrl || saved.token != previous.token) {
+                    attemptedDay = ""
+                    lastSyncAttempt = 0L
+                    mutable.update { it.copy(data = Snapshot()) }
+                    try { repository.store.clearCache() } catch (_: Exception) {
+                        mutable.update { it.copy(message = "Einstellungen gespeichert. Der alte Offline-Cache konnte nicht gelöscht werden.") }
+                    }
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) {
+                mutable.update { it.copy(message = "Sicheres Speichern fehlgeschlagen. Der bisher gespeicherte API-Key bleibt erhalten. Bitte erneut versuchen.") }
+            } finally { mutable.update { it.copy(settingsSaving = false) } }
         }
-        repository.store.settings(settings); mutable.update { it.copy(settings = settings, message = "Verbindungseinstellungen gespeichert.") }; sync(false)
     }
     fun test() = action { val result = api().test(); mutable.update { it.copy(message = result.message) } }
     fun profile(profile: Profile) = action { val saved = api().profile(profile); persist(mutable.value.data.copy(profile = saved, knowledge = api().knowledge())) }

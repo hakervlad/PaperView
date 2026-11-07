@@ -19,7 +19,7 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 private val Context.settingsDataStore by preferencesDataStore("connection")
-class SecureStore(private val context: Context) {
+class SecureStore(private val context: Context) : SettingsStorage {
     private val gson = Gson()
     private val settingKey = stringPreferencesKey("encrypted_settings")
     private val cache = AtomicFile(File(context.noBackupFilesDir, "feed-cache.enc"))
@@ -36,11 +36,11 @@ class SecureStore(private val context: Context) {
         require(bytes.size > 28); init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, bytes.copyOfRange(0, 12)))
         String(doFinal(bytes.copyOfRange(12, bytes.size)), Charsets.UTF_8)
     }
-    suspend fun settings(): Settings {
+    override suspend fun settings(): Settings {
         val raw = context.settingsDataStore.data.first()[settingKey] ?: return Settings()
         return gson.fromJson(decrypt(Base64.decode(raw, Base64.NO_WRAP)), Settings::class.java)
     }
-    suspend fun settings(value: Settings) { context.settingsDataStore.edit { it[settingKey] = Base64.encodeToString(encrypt(gson.toJson(value)), Base64.NO_WRAP) } }
+    override suspend fun settings(value: Settings) { context.settingsDataStore.edit { it[settingKey] = Base64.encodeToString(encrypt(gson.toJson(value)), Base64.NO_WRAP) } }
     fun snapshot(): Snapshot = if (cache.baseFile.exists()) gson.fromJson(decrypt(cache.readFully()), Snapshot::class.java) else Snapshot()
     fun snapshot(value: Snapshot) {
         val stream = cache.startWrite()

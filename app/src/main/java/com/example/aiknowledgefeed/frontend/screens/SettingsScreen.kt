@@ -25,7 +25,8 @@ fun SettingsScreen(vm: PaperViewModel, state: AppState, modifier: Modifier = Mod
     var provider by remember(state.settings) { mutableStateOf(state.settings.provider) }
     var model by remember(state.settings) { mutableStateOf(state.settings.model) }
     var base by remember(state.settings) { mutableStateOf(state.settings.llmBaseUrl) }
-    var apiKeyDraft by remember(state.settings) { mutableStateOf(state.settings.apiKey) }
+    var apiKeyDraft by remember { mutableStateOf("") }
+    LaunchedEffect(state.settings) { apiKeyDraft = "" }
     val profile = state.data.profile
     var subject by remember(profile) { mutableStateOf(profile.bachelor_subject) }
     var focus by remember(profile) { mutableStateOf(profile.focus_areas.joinToString(", ")) }
@@ -54,10 +55,10 @@ fun SettingsScreen(vm: PaperViewModel, state: AppState, modifier: Modifier = Mod
         OutlinedTextField(provider, { provider = it }, label = { Text("Anbieter (z. B. DeepSeek oder Server)") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(model, { model = it }, label = { Text("Modellname (leer: Server-Vorgabe)") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(base, { base = it }, label = { Text("KI-Basis-URL (optional, serverseitig freizugeben)") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(apiKeyDraft, { apiKeyDraft = it }, label = { Text("Eigener API-Key (optional)") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(), singleLine = true)
+        OutlinedTextField(apiKeyDraft, { apiKeyDraft = it }, label = { Text("Eigener API-Key (optional)") }, supportingText = { if (state.settings.apiKey.isNotBlank()) Text("API-Key gespeichert") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(), singleLine = true)
         Text("Modellaufrufe können Kosten verursachen. Der ausgewählte Anbieter erhält relevante Wissenseinträge und Paperinformationen. Dein Backend erhält den eigenen API-Key nur für Modellaufrufe.")
-        Button(onClick = { vm.configure(Settings(backend.trim(), token.trim(), provider, model.trim(), base.trim(), apiKeyDraft.trim())) }, enabled = !state.busy) { Text("Verbindungseinstellungen speichern") }
-        TextButton(onClick = { apiKeyDraft = ""; vm.configure(state.settings.copy(apiKey = "")) }, enabled = !state.busy) { Text("Gespeicherten KI-Schlüssel löschen") }
+        Button(onClick = { vm.configure(Settings(backend.trim(), token.trim(), provider, model.trim(), base.trim(), apiKeyDraft.trim())) }, enabled = !state.settingsSaving) { Text("Verbindungseinstellungen speichern") }
+        TextButton(onClick = { apiKeyDraft = ""; vm.configure(state.settings.copy(apiKey = ""), clearApiKey = true) }, enabled = !state.settingsSaving) { Text("Gespeicherten KI-Schlüssel löschen") }
         Button(onClick = vm::test, enabled = !state.busy) { Text("Gespeicherte Verbindung testen") }
         HorizontalDivider()
         Text("Persönliches Wissen", style = MaterialTheme.typography.titleLarge)
