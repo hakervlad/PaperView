@@ -77,9 +77,9 @@ class PaperViewModel(application: Application) : AndroidViewModel(application) {
     fun profile(profile: Profile) = action { val saved = api().profile(profile); persist(mutable.value.data.copy(profile = saved, knowledge = api().knowledge())) }
     fun openPaper(id: String) { if (mutable.value.data.feed.items.none { it.paper_id == id }) action { val paper = api().paper(id); mutable.update { it.copy(extraPaper = paper) } } }
     fun savePaper(id: String) = action { api().understood(id); persist(mutable.value.data.copy(knowledge = api().knowledge())) }
-    fun removeKnowledge(id: String) = action { api().deleteKnowledge(id); persist(mutable.value.data.copy(knowledge = api().knowledge())) }
+    fun removeKnowledge(id: String) = action { api().deleteKnowledge(id); persist(mutable.value.data.copy(knowledge = api().knowledge(), profile = api().profile())) }
     fun updateKnowledge(value: Knowledge, name: String, description: String, status: String) = action {
-        api().update(value.id, KnowledgeUpdate(name, description, status)); persist(mutable.value.data.copy(knowledge = api().knowledge(), documents = api().documents()))
+        api().update(value.id, KnowledgeUpdate(name, description, status)); persist(mutable.value.data.copy(knowledge = api().knowledge(), documents = api().documents(), profile = api().profile()))
     }
     fun upload(uri: Uri) = action { repository.upload(api(), getApplication(), uri); persist(mutable.value.data.copy(documents = api().documents())) }
     fun analyze(id: String) = action { api().analyze(id, Consent(true)); persist(mutable.value.data.copy(documents = api().documents(), knowledge = api().knowledge())) }

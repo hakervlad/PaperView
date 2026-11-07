@@ -50,3 +50,8 @@ Executed `:app:assembleDebug :app:testDebugUnitTest :app:lintDebug` with the exi
 - No valid LLM_API_KEY was configured in this environment. **No real paid KI/model call was performed.** Neither live source availability nor scientific correctness is established by provider doubles.
 - **APK-on-device end-to-end verification remains OPEN**: both emulator starts failed inside the emulator's QEMU runtime with hanging CPU/main-loop threads and exit 139. This is not an app crash report. SAF UI, Keystore encryption/decryption and persistent cache behavior on a real Android device still require device verification. The previously successful frontend-only emulator test does not validate these new functions.
 - Issue #1 must remain open until those device acceptance checks are completed. No claim of full acceptance is made by merging the code.
+
+
+### Final follow-up
+
+Live source probes succeeded against both OpenAlex and arXiv using the real source adapters (metadata only; no LLM or paid model call). Final regression review also fixed profile synchronization: deleted, renamed or demoted explicit knowledge must not be resurrected/reconfirmed by a later profile save. Android reloads the profile after knowledge mutations. Backend suite now contains 26 passing tests. The final Android suite still contains 10 tests, including the opt-in real-socket client integration. Device validation remains pending for the emulator failure described above; issue #1 stays open.

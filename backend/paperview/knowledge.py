@@ -28,9 +28,16 @@ class KnowledgeService:
         k=Knowledge.model_validate(self.store.require('knowledge',id))
         if any(x.id!=id and norm(x.name)==norm(update.name) for x in self.all()):
             raise ServiceError('duplicate_concept','Dieser Begriff ist bereits vorhanden.',409)
+        profile = self.profile()
+        profile.familiar_topics = [update.name if norm(name) == norm(k.name) else name for name in profile.familiar_topics if norm(name) != norm(k.name) or update.status == 'confirmed']
+        self.store.put('profile','single',profile.model_dump())
         k= k.model_copy(update=update.model_dump()); self.store.put('knowledge',id,k.model_dump()); return k
     def delete(self,id):
-        self.store.require('knowledge',id); self.store.delete('knowledge',id)
+        removed = Knowledge.model_validate(self.store.require('knowledge',id))
+        profile = self.profile()
+        profile.familiar_topics = [name for name in profile.familiar_topics if norm(name) != norm(removed.name)]
+        self.store.put('profile','single',profile.model_dump())
+        self.store.delete('knowledge',id)
         for k in self.all():
             if id in k.connections:
                 k.connections.remove(id); self.store.put('knowledge',k.id,k.model_dump())

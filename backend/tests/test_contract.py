@@ -94,3 +94,29 @@ async def test_feed_reuse_failure_concurrency(env):
         assert (await c.post('/v1/feed/generate',json={'timezone':'Europe/Berlin'})).status_code==503
         assert (await c.get('/v1/feed')).json()['date']==good['date']
         assert (await c.post('/v1/feed/generate',json={'timezone':'Europe/Berlin'})).status_code==429
+
+
+async def test_deleted_explicit_topic_is_not_resurrected(env):
+    async with await client(env) as c:
+        p=(await c.get('/v1/profile')).json(); p['familiar_topics']=['Bayes']
+        await c.put('/v1/profile',json=p)
+        concept=(await c.get('/v1/knowledge')).json()[0]
+        await c.put('/v1/knowledge/'+concept['id'],json={'name':'Bayesian inference','description':'Updated','status':'confirmed'})
+        await c.delete('/v1/knowledge/'+concept['id'])
+        p=(await c.get('/v1/profile')).json()
+        assert p['familiar_topics']==[]
+        p['bachelor_subject']='Biologie'
+        await c.put('/v1/profile',json=p)
+        assert (await c.get('/v1/knowledge')).json()==[]
+
+
+async def test_demoted_topic_not_reconfirmed_by_profile_save(env):
+    async with await client(env) as c:
+        p=(await c.get('/v1/profile')).json(); p['familiar_topics']=['Bayes']
+        await c.put('/v1/profile',json=p)
+        concept=(await c.get('/v1/knowledge')).json()[0]
+        await c.put('/v1/knowledge/'+concept['id'],json={'name':'Bayes','description':'Noch lernen','status':'learning'})
+        p=(await c.get('/v1/profile')).json()
+        assert p['familiar_topics']==[]
+        await c.put('/v1/profile',json=p)
+        assert (await c.get('/v1/knowledge')).json()[0]['status']=='learning'
