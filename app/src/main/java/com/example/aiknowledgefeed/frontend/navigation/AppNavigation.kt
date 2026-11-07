@@ -4,6 +4,14 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.aiknowledgefeed.backend.models.*
+import com.example.aiknowledgefeed.frontend.screens.SettingsScreen
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -31,6 +39,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.aiknowledgefeed.frontend.components.PaperIcons
+import com.example.aiknowledgefeed.frontend.demo.DemoArticle
 import com.example.aiknowledgefeed.frontend.demo.DemoContent
 import com.example.aiknowledgefeed.frontend.demo.DemoKnowledge
 import com.example.aiknowledgefeed.frontend.screens.DetailScreen
@@ -45,16 +54,11 @@ private const val DetailRoute = "article/{articleId}"
 fun AppNavigation(darkTheme: Boolean, onToggleTheme: () -> Unit, modifier: Modifier = Modifier) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
-    var knowledgeIds by rememberSaveable {
-        mutableStateOf<List<String>>(DemoContent.initialKnowledge.map { it.id })
-    }
-    val articleKnowledge = DemoContent.articles.map { article ->
-        DemoKnowledge(id = "article-${article.id}", title = article.topic,
-            category = article.category, description = article.takeaway,
-            connections = article.priorKnowledge, articleId = article.id)
-    }
-    val allKnowledge = DemoContent.initialKnowledge + articleKnowledge
-    val knowledge = allKnowledge.filter { it.id in knowledgeIds }
+    val vm: com.example.aiknowledgefeed.frontend.viewmodels.PaperViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val state by vm.state.collectAsStateWithLifecycle()
+    androidx.lifecycle.compose.LifecycleResumeEffect(vm) { vm.refresh(); onPauseOrDispose { } }
+    val knowledge = state.data.knowledge.filter { it.status == "confirmed" }.map { concept -> concept.asCard().copy(connections = concept.connections.mapNotNull { id -> state.data.knowledge.firstOrNull { it.id == id }?.name }) }
+    val articles = state.data.feed.items.map { it.asArticle() }
     val savedArticleIds = knowledge.mapNotNull { it.articleId }.toSet()
     // Dient nur der passenden Tab-Markierung auf der Detailseite.
     var detailOrigin by rememberSaveable { mutableStateOf(FeedRoute) }
@@ -72,7 +76,8 @@ fun AppNavigation(darkTheme: Boolean, onToggleTheme: () -> Unit, modifier: Modif
     }
     fun openArticle(id: String, origin: String) {
         detailOrigin = origin
-        navController.navigate("article/$id") { launchSingleTop = true }
+        vm.openPaper(id)
+        navController.navigate("article/${android.net.Uri.encode(id)}") { launchSingleTop = true }
     }
 
     Scaffold(modifier = modifier, containerColor = MaterialTheme.colorScheme.background,
@@ -88,8 +93,15 @@ fun AppNavigation(darkTheme: Boolean, onToggleTheme: () -> Unit, modifier: Modif
         },
     ) { innerPadding ->
         Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.TopCenter) {
+            Column(Modifier.fillMaxSize()) {
+                Row(Modifier.fillMaxWidth()) {
+                    TextButton(onClick = { vm.generate() }, enabled = !state.busy) { Text("Feed aktualisieren") }
+                    TextButton(onClick = { navController.navigate("settings") { launchSingleTop = true } }) { Text("Einstellungen") }
+                }
+                if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                state.message?.let { Text((if (state.offline) "Offline · " else "") + it, Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall) }
             NavHost(navController = navController, startDestination = FeedRoute,
-                modifier = Modifier.widthIn(max = 760.dp).fillMaxSize(),
+                modifier = Modifier.widthIn(max = 760.dp).weight(1f),
                 enterTransition = { fadeIn(tween(240)) + slideInHorizontally(tween(240)) { it / 24 } },
                 exitTransition = { fadeOut(tween(150)) },
                 popEnterTransition = { fadeIn(tween(200)) },
@@ -98,28 +110,30 @@ fun AppNavigation(darkTheme: Boolean, onToggleTheme: () -> Unit, modifier: Modif
                 composable(FeedRoute) {
                     FeedScreen(knowledgeCount = knowledge.size, savedArticleIds = savedArticleIds,
                         darkTheme = darkTheme, onToggleTheme = onToggleTheme,
-                        onOpenArticle = { openArticle(it, FeedRoute) })
+                        onOpenArticle = { openArticle(it, FeedRoute) }, sourceArticles = articles, live = true)
                 }
                 composable(KnowledgeRoute) {
                     KnowledgeScreen(knowledge = knowledge, darkTheme = darkTheme,
                         onToggleTheme = onToggleTheme,
-                        onRemove = { id -> knowledgeIds = knowledgeIds.filterNot { it == id } },
+                        onRemove = vm::removeKnowledge,
                         onOpenArticle = { openArticle(it, KnowledgeRoute) },
                         onDiscover = { openTab(FeedRoute) },
-                        onReset = { knowledgeIds = DemoContent.initialKnowledge.map { it.id } })
+                        onReset = {}, live = true)
                 }
                 composable(DetailRoute, arguments = listOf(navArgument("articleId") { type = NavType.StringType })) { entry ->
-                    val article = DemoContent.articles.firstOrNull { it.id == entry.arguments?.getString("articleId") }
+                    val id = entry.arguments?.getString("articleId")
+                    val article = articles.firstOrNull { it.id == id } ?: state.extraPaper?.takeIf { it.id == id }?.let { paper ->
+                        DemoArticle(paper.id, com.example.aiknowledgefeed.frontend.demo.DemoCategory.Science, paper.title, paper.abstract, emptyList(), paper.title, paper.abstract, "Keine gespeicherte personalisierte Erklärung für diese Quelle verfügbar.", "Originalquelle prüfen.", date = paper.published_at, sourceUrl = paper.url, abstractBased = true, isDemo = false)
+                    }
                     if (article != null) {
                         DetailScreen(article = article, saved = article.id in savedArticleIds,
                             onBack = { navController.popBackStack() },
-                            onSave = {
-                                val id = "article-${article.id}"
-                                if (id !in knowledgeIds) knowledgeIds = knowledgeIds + id
-                            },
-                            onOpenKnowledge = { openTab(KnowledgeRoute) })
+                            onSave = { vm.savePaper(article.id) },
+                            onOpenKnowledge = { openTab(KnowledgeRoute) }, busy = state.busy)
                     }
                 }
+                composable("settings") { SettingsScreen(vm, state) }
+            }
             }
         }
     }

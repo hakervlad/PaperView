@@ -18,7 +18,7 @@ import com.example.aiknowledgefeed.frontend.theme.AIKnowledgeFeedTheme
 private fun FeedPreview() {
     val darkTheme = isSystemInDarkTheme()
     AIKnowledgeFeedTheme {
-        AppNavigation(darkTheme = darkTheme, onToggleTheme = {})
+        Surface { FeedScreen(DemoContent.initialKnowledge.size, emptySet(), darkTheme, {}, {}) }
     }
 }
 

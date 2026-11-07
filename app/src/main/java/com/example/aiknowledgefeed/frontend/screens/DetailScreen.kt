@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -45,7 +46,9 @@ fun DetailScreen(
     onSave: () -> Unit,
     onOpenKnowledge: () -> Unit,
     modifier: Modifier = Modifier,
+    busy: Boolean = false,
 ) {
+    val uriHandler = LocalUriHandler.current
     val buttonColor by animateColorAsState(
         if (saved) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.primary,
         label = "Speicherstatus",
@@ -66,16 +69,19 @@ fun DetailScreen(
                     modifier = Modifier.semantics { heading() })
                 Text("${article.date} · ${article.readingMinutes} Minuten Lesezeit",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Demo-Quelle: PaperView Ideenredaktion · frei erfunden",
+                Text(if (article.isDemo) "Demo-Quelle: PaperView Ideenredaktion · frei erfunden" else "Quelle: ${article.sourceUrl}",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                DemoNotice()
+                if (article.isDemo) DemoNotice() else {
+                    Text(if (article.abstractBased) "Abstractbasierte Erklärung: Der Volltext wurde nicht ausgewertet." else "Quellengestützte Erklärung")
+                    if (article.sourceUrl.startsWith("https://")) TextButton(onClick = { uriHandler.openUri(article.sourceUrl) }) { Text("Originalquelle öffnen") }
+                }
             }
         }
         item { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant) }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 SectionHeading("Dein Vorwissen", eyebrow = "01 · DEIN AUSGANGSPUNKT")
-                Text("In diesem Beispiel knüpfen wir an diese vertrauten Themen an:",
+                Text(if (article.priorKnowledge.isEmpty()) "Bisher keine direkte bestätigte Wissensverbindung. Die Erklärung führt die notwendigen Grundlagen ein." else "Diese bestätigten Konzepte wurden für die Erklärung verwendet:",
                     style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TopicTags(article.priorKnowledge)
             }
@@ -90,7 +96,7 @@ fun DetailScreen(
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 SectionHeading("Die Verbindung zu deinem Wissen", eyebrow = "03 · JETZT PASST ES ZUSAMMEN")
                 KnowledgeConnection(article.priorKnowledge, explanation = article.connection,
-                    title = "Bekanntes trifft Neues")
+                    title = if (article.priorKnowledge.isEmpty()) "Grundlagen für dieses Thema" else "Bekanntes trifft Neues")
             }
         }
         item {
@@ -104,7 +110,7 @@ fun DetailScreen(
         }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = onSave, enabled = !saved,
+                Button(onClick = onSave, enabled = !saved && !busy,
                     modifier = Modifier.fillMaxWidth().semantics {
                         stateDescription = if (saved) "In der Demo-Wissenssammlung gespeichert" else "Noch nicht gespeichert"
                     },
@@ -124,7 +130,7 @@ fun DetailScreen(
                         }
                     }
                 }
-                Text("Nur in dieser Demo-Sammlung. Keine dauerhafte Speicherung.",
+                Text(if (article.isDemo) "Nur in dieser Demo-Sammlung. Keine dauerhafte Speicherung." else "Dieses Thema wird dauerhaft in deinem Wissensprofil gespeichert.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (saved) {
                     TextButton(onClick = onOpenKnowledge, modifier = Modifier.fillMaxWidth()) {
