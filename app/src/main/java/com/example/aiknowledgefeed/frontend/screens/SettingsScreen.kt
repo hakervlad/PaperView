@@ -49,16 +49,20 @@ fun SettingsScreen(vm: PaperViewModel, state: AppState, modifier: Modifier = Mod
         Text("Backend-Verbindung", style = MaterialTheme.typography.titleLarge)
         OutlinedTextField(backend, { backend = it }, label = { Text("Vertrauenswürdige Backend-URL") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
         OutlinedTextField(token, { token = it }, label = { Text("Backend-Zugriffsschlüssel") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(), singleLine = true)
-        Text("Lokales HTTP ist ausschließlich im Debug-Build für localhost und den Emulator erlaubt. Eigene KI-Schlüssel benötigen immer HTTPS.")
+        Text("Das Backend muss laufen und vom Smartphone erreichbar sein. Verwende eine HTTPS-Adresse mit gültigem Zertifikat und den separaten Backend-Zugriffsschlüssel. localhost ist das Smartphone; 10.0.2.2 gilt nur im Emulator. Eigene KI-Schlüssel benötigen immer HTTPS.")
         Text("KI-Modell konfigurieren", style = MaterialTheme.typography.titleLarge)
         OutlinedTextField(provider, { provider = it }, label = { Text("Anbieter (z. B. DeepSeek oder Server)") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(model, { model = it }, label = { Text("Modellname (leer: Server-Vorgabe)") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(base, { base = it }, label = { Text("KI-Basis-URL (optional, serverseitig freizugeben)") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(apiKeyDraft, { apiKeyDraft = it }, label = { Text("Eigener API-Key (optional)") }, supportingText = { if (state.settings.apiKey.isNotBlank()) Text("API-Key gespeichert") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(), singleLine = true)
-        Text("Modellaufrufe können Kosten verursachen. Der ausgewählte Anbieter erhält relevante Wissenseinträge und Paperinformationen. Dein Backend erhält den eigenen API-Key nur für Modellaufrufe.")
+        Text("Der Anbietername dient als Bezeichnung. Entscheidend sind die KI-Basis-URL und der exakte Modellname (leer: Server-Vorgabe). Modellaufrufe können Kosten verursachen. Der ausgewählte Anbieter erhält relevante Wissenseinträge und Paperinformationen. Dein Backend erhält den eigenen API-Key nur für Modellaufrufe.")
         Button(onClick = { vm.configure(Settings(backend.trim(), token.trim(), provider, model.trim(), base.trim(), apiKeyDraft.trim())) }, enabled = !state.settingsSaving) { Text("Verbindungseinstellungen speichern") }
         TextButton(onClick = { apiKeyDraft = ""; vm.configure(state.settings.copy(apiKey = ""), clearApiKey = true) }, enabled = !state.settingsSaving) { Text("Gespeicherten KI-Schlüssel löschen") }
-        Button(onClick = vm::test, enabled = !state.busy) { Text("Gespeicherte Verbindung testen") }
+        Button(onClick = vm::test, enabled = !state.busy && !state.settingsSaving) { Text("Gespeicherte Verbindung testen") }
+        state.connectionSteps.forEach { step ->
+            Text("${step.title}: ${step.status}", style = MaterialTheme.typography.titleSmall)
+            if (step.detail.isNotBlank()) Text(step.detail, style = MaterialTheme.typography.bodySmall)
+        }
         HorizontalDivider()
         Text("Persönliches Wissen", style = MaterialTheme.typography.titleLarge)
         OutlinedTextField(subject, { subject = it }, label = { Text("Studiengang / Bachelorfach") }, modifier = Modifier.fillMaxWidth())

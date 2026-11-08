@@ -8,14 +8,17 @@ import com.example.aiknowledgefeed.backend.models.*
 import com.example.aiknowledgefeed.backend.repositories.PaperViewRepository
 import com.example.aiknowledgefeed.backend.services.SettingsPersistence
 import com.example.aiknowledgefeed.backend.services.SecureStore
-import com.google.gson.JsonParser
+import com.example.aiknowledgefeed.backend.services.ConnectionStep
+import com.example.aiknowledgefeed.backend.services.ConnectionDiagnostics
+import com.example.aiknowledgefeed.backend.services.FailureMessages
+import android.util.Log
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import retrofit2.HttpException
 import java.time.LocalDate
 import java.time.ZoneId
 
- data class AppState(val settings: Settings = Settings(), val data: Snapshot = Snapshot(), val busy: Boolean = false, val message: String? = null, val offline: Boolean = false, val extraPaper: Paper? = null, val settingsSaving: Boolean = false)
+ data class AppState(val settings: Settings = Settings(), val data: Snapshot = Snapshot(), val busy: Boolean = false, val message: String? = null, val offline: Boolean = false, val extraPaper: Paper? = null, val settingsSaving: Boolean = false, val connectionSteps: List<ConnectionStep> = emptyList())
 class PaperViewModel @JvmOverloads constructor(application: Application,
     private val settingsPersistence: SettingsPersistence = SettingsPersistence(SecureStore(application)),
 ) : AndroidViewModel(application) {
@@ -33,13 +36,19 @@ class PaperViewModel @JvmOverloads constructor(application: Application,
             return@action
         }
         mutable.update { it.copy(settings = settings) }
-        val cache = repository.store.snapshot()
+        val cache = try { repository.store.snapshot() } catch (_: Exception) {
+            mutable.update { it.copy(message = "Der Offline-Cache konnte nicht geladen werden. Daten werden erneut vom Backend abgerufen.") }
+            Snapshot()
+        }
         mutable.update { it.copy(settings = settings, data = cache) }
         if (settings.token.isNotBlank()) sync(true)
         else mutable.update { it.copy(message = "Bitte zuerst das Backend in den Einstellungen konfigurieren.") }
     } }
-    private fun action(block: suspend () -> Unit) {
-        if (mutable.value.busy || mutable.value.settingsSaving) return
+    private fun action(quietIfBusy: Boolean = false, block: suspend () -> Unit) {
+        if (mutable.value.busy || mutable.value.settingsSaving) {
+            if (!quietIfBusy) mutable.update { it.copy(message = "Ein Vorgang läuft bereits. Bitte nach Abschluss erneut versuchen; es wurde nichts zusätzlich gespeichert.") }
+            return
+        }
         mutable.update { it.copy(busy = true, message = null) }
         operationJob = viewModelScope.launch(Dispatchers.IO) {
             try { block() } catch (e: CancellationException) { throw e }
@@ -47,15 +56,31 @@ class PaperViewModel @JvmOverloads constructor(application: Application,
             finally { mutable.update { it.copy(busy = false) } }
         }
     }
-    private fun safeError(e: Exception): String = when (e) {
-        is HttpException -> runCatching { JsonParser.parseString(e.response()?.errorBody()?.string()).asJsonObject.getAsJsonObject("error").get("message").asString }.getOrNull()
-            ?: "Backend-Anfrage fehlgeschlagen (${e.code()}). Bitte Einstellungen prüfen."
-        is java.io.IOException -> "Verbindung nicht verfügbar. Der zuletzt gespeicherte Stand bleibt sichtbar."
-        is IllegalArgumentException, is IllegalStateException -> "Ungültige Eingabe oder unsichere Verbindung. Bitte HTTPS-Adresse und Zugriffsschlüssel prüfen."
-        else -> "Verarbeitung fehlgeschlagen. Bitte erneut versuchen."
+    private fun safeError(e: Exception): String {
+        // Never log Throwable/message, URLs, headers, documents or response bodies.
+        Log.w("PaperView", "request_failed type=${e.javaClass.simpleName} status=${(e as? HttpException)?.code() ?: 0}")
+        return FailureMessages.message(FailureMessages.code(e))
     }
     private fun api() = repository.api(mutable.value.settings)
-    private fun persist(data: Snapshot) { repository.store.snapshot(data); mutable.update { it.copy(data = data, offline = false) } }
+    private fun persist(data: Snapshot): Boolean {
+        // A server acknowledgement remains valid even if the optional local cache fails.
+        mutable.update { it.copy(data = data, offline = false) }
+        return try { repository.store.snapshot(data); true }
+        catch (_: Exception) {
+            mutable.update { it.copy(message = "Serverdaten geladen. Der verschlüsselte Offline-Cache konnte nicht aktualisiert werden.") }; false
+        }
+    }
+    private suspend fun acknowledged(data: Snapshot, confirmation: String, refresh: (suspend () -> Snapshot)? = null) {
+        val cached = persist(data)
+        mutable.update { it.copy(message = confirmation + if (cached) "" else " Der Offline-Cache konnte nicht aktualisiert werden.") }
+        if (refresh != null) try {
+            if (!persist(refresh())) mutable.update { it.copy(message = "$confirmation Der Offline-Cache konnte nicht aktualisiert werden.") }
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) {
+            mutable.update { it.copy(message = "$confirmation Weitere Daten konnten nicht aktualisiert werden: ${safeError(e)}") }
+        }
+    }
+    private fun List<Knowledge>.upsert(value: Knowledge) = filterNot { it.id == value.id } + value
     private suspend fun sync(generate: Boolean) {
         val now = android.os.SystemClock.elapsedRealtime()
         if (generate && now - lastSyncAttempt < 60_000 && lastSyncAttempt != 0L) return
@@ -71,7 +96,7 @@ class PaperViewModel @JvmOverloads constructor(application: Application,
             mutable.update { it.copy(message = next.message) }
         }
     }
-    fun refresh() = action { sync(true) }
+    fun refresh() = action(quietIfBusy = true) { sync(true) }
     fun generate() = action {
         val feed = api().generate(Generation(ZoneId.systemDefault().id))
         persist(mutable.value.data.copy(feed = feed)); mutable.update { it.copy(message = feed.message) }
@@ -86,7 +111,7 @@ class PaperViewModel @JvmOverloads constructor(application: Application,
                 operationJob?.cancelAndJoin()
                 val previous = mutable.value.settings
                 val saved = settingsPersistence.save(settings, clearApiKey)
-                mutable.update { it.copy(settings = saved, message = if (saved.apiKey.isNotBlank())
+                mutable.update { it.copy(settings = saved, connectionSteps = emptyList(), message = if (saved.apiKey.isNotBlank())
                     "API-Key gespeichert. Verbindungseinstellungen lokal gespeichert."
                     else "Verbindungseinstellungen lokal gespeichert.") }
                 if (saved.backendUrl != previous.backendUrl || saved.token != previous.token) {
@@ -103,15 +128,52 @@ class PaperViewModel @JvmOverloads constructor(application: Application,
             } finally { mutable.update { it.copy(settingsSaving = false) } }
         }
     }
-    fun test() = action { val result = api().test(); mutable.update { it.copy(message = result.message) } }
-    fun profile(profile: Profile) = action { val saved = api().profile(profile); persist(mutable.value.data.copy(profile = saved, knowledge = api().knowledge())) }
-    fun openPaper(id: String) { if (mutable.value.data.feed.items.none { it.paper_id == id }) action { val paper = api().paper(id); mutable.update { it.copy(extraPaper = paper) } } }
-    fun savePaper(id: String) = action { api().understood(id); persist(mutable.value.data.copy(knowledge = api().knowledge())) }
-    fun removeKnowledge(id: String) = action { api().deleteKnowledge(id); persist(mutable.value.data.copy(knowledge = api().knowledge(), profile = api().profile())) }
-    fun updateKnowledge(value: Knowledge, name: String, description: String, status: String) = action {
-        api().update(value.id, KnowledgeUpdate(name, description, status)); persist(mutable.value.data.copy(knowledge = api().knowledge(), documents = api().documents(), profile = api().profile()))
+    fun test() = action {
+        // Configuration and transport failures are separate from the locally saved key.
+        val steps = ConnectionDiagnostics(api()) { error ->
+            Log.w("PaperView", "connection_check_failed type=${error.javaClass.simpleName} status=${(error as? HttpException)?.code() ?: 0}")
+        }.run { progress -> mutable.update { it.copy(connectionSteps = progress) } }
+        mutable.update { it.copy(message = if (steps.all { step -> step.status == "Erfolgreich" })
+            "Backend und echter Modellaufruf erfolgreich geprüft."
+            else "Verbindungsprüfung nicht erfolgreich. Details bei den Prüfschritten.") }
     }
-    fun upload(uri: Uri) = action { repository.upload(api(), getApplication(), uri); persist(mutable.value.data.copy(documents = api().documents())) }
-    fun analyze(id: String) = action { api().analyze(id, Consent(true)); persist(mutable.value.data.copy(documents = api().documents(), knowledge = api().knowledge())) }
-    fun removeDocument(id: String) = action { api().deleteDocument(id); persist(mutable.value.data.copy(documents = api().documents(), knowledge = api().knowledge())) }
+    fun profile(profile: Profile) = action {
+        val saved = api().profile(profile)
+        acknowledged(mutable.value.data.copy(profile = saved), "Wissensprofil auf dem Backend gespeichert.") {
+            mutable.value.data.copy(knowledge = api().knowledge())
+        }
+    }
+    fun openPaper(id: String) { if (mutable.value.data.feed.items.none { it.paper_id == id }) action { val paper = api().paper(id); mutable.update { it.copy(extraPaper = paper) } } }
+    fun savePaper(id: String) = action {
+        val saved = api().understood(id)
+        acknowledged(mutable.value.data.copy(knowledge = mutable.value.data.knowledge.upsert(saved)), "Thema dauerhaft auf dem Backend gespeichert.")
+    }
+    fun removeKnowledge(id: String) = action {
+        api().deleteKnowledge(id)
+        val knowledge = mutable.value.data.knowledge.filterNot { it.id == id }.map { it.copy(connections = it.connections - id) }
+        acknowledged(mutable.value.data.copy(knowledge = knowledge), "Wissenseintrag auf dem Backend entfernt.") {
+            mutable.value.data.copy(knowledge = api().knowledge(), profile = api().profile(), documents = api().documents())
+        }
+    }
+    fun updateKnowledge(value: Knowledge, name: String, description: String, status: String) = action {
+        val saved = api().update(value.id, KnowledgeUpdate(name, description, status))
+        acknowledged(mutable.value.data.copy(knowledge = mutable.value.data.knowledge.upsert(saved)), "Wissenskonzept auf dem Backend gespeichert.") {
+            mutable.value.data.copy(documents = api().documents(), profile = api().profile())
+        }
+    }
+    fun upload(uri: Uri) = action {
+        val saved = repository.upload(api(), getApplication(), uri)
+        acknowledged(mutable.value.data.copy(documents = mutable.value.data.documents.filterNot { it.id == saved.id } + saved), "PDF auf dem Backend gespeichert und Text extrahiert.")
+    }
+    fun analyze(id: String) = action {
+        val saved = api().analyze(id, Consent(true))
+        val knowledge = saved.concepts.fold(mutable.value.data.knowledge) { values, concept -> values.upsert(concept) }
+        acknowledged(mutable.value.data.copy(documents = mutable.value.data.documents.filterNot { it.id == id } + saved, knowledge = knowledge), "Konzepte ermittelt. Bitte das mögliche Vorwissen prüfen und bestätigen.")
+    }
+    fun removeDocument(id: String) = action {
+        api().deleteDocument(id)
+        acknowledged(mutable.value.data.copy(documents = mutable.value.data.documents.filterNot { it.id == id }), "Dokument auf dem Backend gelöscht.") {
+            mutable.value.data.copy(knowledge = api().knowledge())
+        }
+    }
 }

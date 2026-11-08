@@ -23,7 +23,7 @@ class PaperViewRepository(val store: SecureStore) {
             val builder = request.newBuilder().header("Authorization", "Bearer ${settings.token}")
             if (llm) {
                 if (settings.apiKey.isNotBlank()) {
-                    check(request.url.isHttps) { "Ein eigener KI-Schlüssel darf ausschließlich über HTTPS übertragen werden." }
+                    if (!request.url.isHttps) throw com.example.aiknowledgefeed.backend.services.ConnectionFailure("https_required")
                     builder.header("X-LLM-Key", settings.apiKey)
                 }
                 if (settings.model.isNotBlank()) builder.header("X-LLM-Model", settings.model)

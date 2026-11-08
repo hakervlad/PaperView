@@ -16,3 +16,5 @@ data class Settings(val backendUrl: String = "https://", val token: String = "",
 data class Snapshot(val feed: Feed = Feed(), val knowledge: List<Knowledge> = emptyList(), val profile: Profile = Profile(), val documents: List<Document> = emptyList())
 fun FeedItem.asArticle() = DemoArticle(id = paper_id, category = DemoCategory.entries.firstOrNull { it.label == category } ?: DemoCategory.Science, title = title, summary = summary, priorKnowledge = prior_knowledge.map { it.name }, topic = title, detail = new_insight + "\n\nWarum ist das relevant?\n" + relevance, connection = connection, takeaway = takeaway, date = published_at, sourceUrl = source_url, abstractBased = abstract_based, isDemo = false)
 fun Knowledge.asCard() = DemoKnowledge(id, name, DemoCategory.Science, description, connections, source_paper_id)
+
+data class Health(val ok: Boolean = false)

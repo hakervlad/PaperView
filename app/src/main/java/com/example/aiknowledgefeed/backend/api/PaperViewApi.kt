@@ -5,6 +5,7 @@ import okhttp3.MultipartBody
 import retrofit2.http.*
 
 interface PaperViewApi {
+    @GET("health") suspend fun health(): Health
     @GET("v1/profile") suspend fun profile(): Profile
     @PUT("v1/profile") suspend fun profile(@Body profile: Profile): Profile
     @GET("v1/knowledge") suspend fun knowledge(): List<Knowledge>

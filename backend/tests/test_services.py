@@ -55,7 +55,7 @@ async def test_personalization_actual_ids(tmp_path):
     k.delete(known.id)
     with pytest.raises(ServiceError): await p.explain(paper(),Profile(),None)
 
-@pytest.mark.parametrize('status,code',[(401,'llm_invalid_key'),(402,'llm_rate_limit'),(429,'llm_rate_limit'),(404,'llm_model_unavailable'),(302,'llm_unavailable'),(200,'llm_invalid_json')])
+@pytest.mark.parametrize('status,code',[(401,'llm_invalid_key'),(402,'llm_insufficient_quota'),(429,'llm_rate_limit'),(404,'llm_model_unavailable'),(302,'llm_unavailable'),(200,'llm_invalid_json')])
 async def test_llm_http(monkeypatch,status,code):
     from paperview.llm import LLMService
     from paperview.config import Settings
