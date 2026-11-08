@@ -105,7 +105,7 @@ class LocalKnowledgeRepository(val db: LocalDatabase) {
             old.connections.mapNotNull { mapping[it] }.filter { it != id }.forEach { dao.link(LinkRow(id, it)) }
             old.document_ids.filter { doc -> dao.documents().any { it.id == doc } }.forEach { dao.evidence(EvidenceRow(it, id, "[]")) }
         }
-        if (snapshot.feed.items.isNotEmpty() && dao.feed(snapshot.feed.date) == null) {
+        if (snapshot.feed.date.isNotBlank() && snapshot.feed.status in listOf("success", "completed", "ready") && dao.feed(snapshot.feed.date) == null) {
             val feed = snapshot.feed.copy(status = "success", items = snapshot.feed.items.map { item -> item.copy(prior_knowledge = item.prior_knowledge.map { k -> k.copy(id = mapping[k.id] ?: k.id) }) })
             feed.items.forEach { item ->
                 if (dao.paper(item.paper_id) == null) dao.paper(PaperRow(item.paper_id, null, null, gson.toJson(Paper(item.paper_id, item.title, emptyList(), "", item.published_at, item.category, "legacy-cache", item.source_url, "unknown"))))

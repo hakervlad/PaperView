@@ -36,7 +36,7 @@ class SettingsNavigationRegressionTest {
         compose.setContent { MaterialTheme { AppNavigation(false, {}, vm = vm) } }
         compose.onNodeWithText("Einstellungen").performClick()
         compose.onNodeWithText("Eigener API-Key (optional)").performScrollTo().performTextInput("fixture-not-a-real-key")
-        compose.onNodeWithText("Verbindungseinstellungen speichern").performScrollTo().performClick()
+        compose.onNodeWithText("KI-Einstellungen speichern").performScrollTo().performClick()
         compose.waitUntil(10000) { vm.state.value.settings.apiKey == "fixture-not-a-real-key" }
         compose.onNodeWithText("Mein Wissen").performClick()
         compose.onNodeWithText("Einstellungen").performClick()
@@ -160,7 +160,7 @@ class SettingsNavigationRegressionTest {
         compose.onNodeWithText("Eigener API-Key (optional)").performScrollTo().performTextInput("fixture-typed-before-load")
         gate.complete(Unit)
         compose.waitUntil(10000) { !vm.state.value.busy }
-        compose.onNodeWithText("Verbindungseinstellungen speichern").performScrollTo().performClick()
+        compose.onNodeWithText("KI-Einstellungen speichern").performScrollTo().performClick()
         compose.waitUntil(10000) { vm.state.value.settings.apiKey == "fixture-typed-before-load" }
     }
 }

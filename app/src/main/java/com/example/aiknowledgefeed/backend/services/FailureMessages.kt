@@ -12,6 +12,7 @@ import javax.net.ssl.SSLException
 class ConnectionFailure(val code: String) : IOException()
 object FailureMessages {
     fun code(error: Exception): String = when (error) {
+        is android.database.sqlite.SQLiteException -> "local_storage"
         is ConnectionFailure -> error.code
         is SSLException -> "tls_error"
         is SocketTimeoutException -> "timeout"
