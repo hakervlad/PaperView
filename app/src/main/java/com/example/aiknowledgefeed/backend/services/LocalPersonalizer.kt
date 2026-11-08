@@ -24,7 +24,7 @@ class LocalPersonalizer(private val knowledge: LocalKnowledgeRepository, private
             require(ids.size <= 8 && ids.all { id -> known.any { it.id == id } })
             val current = knowledge.knowledge().filter { it.status == "confirmed" }.map { it.id }.toSet()
             require(ids.all { it in current })
-            val connection = answer.get("connection").asString.also { require(it.length <= 6000 && (ids.isNotEmpty() || it.isBlank())) }
+            val connection = answer.get("connection").asString.also { require(it.length <= 6000 && (ids.isEmpty() == it.isBlank())) }
             val summary = text("summary")
             return FeedItem(localId(), paper.id, text("title", 500), "Auf Grundlage des Abstracts: " + (if (ids.isEmpty()) "Kein direkter Wissensbezug gespeichert. " else "") + summary,
                 known.filter { it.id in ids }, text("new_insight"), connection, text("relevance"), text("takeaway"), true, paper.url, paper.published_at, paper.field)

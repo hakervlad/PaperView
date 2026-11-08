@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.*
 import java.time.LocalDate
 import java.time.ZoneId
 
- data class AppState(val settings: Settings = Settings(), val data: Snapshot = Snapshot(), val busy: Boolean = true, val message: String? = null, val offline: Boolean = false, val extraPaper: Paper? = null, val settingsSaving: Boolean = false, val connectionSteps: List<ConnectionStep> = emptyList(), val feedGenerating: Boolean = false)
+ data class AppState(val settings: Settings = Settings(), val data: Snapshot = Snapshot(), val busy: Boolean = true, val message: String? = null, val offline: Boolean = false, val extraPaper: Paper? = null, val settingsSaving: Boolean = false, val connectionSteps: List<ConnectionStep> = emptyList(), val feedGenerating: Boolean = false, val extraFeedItem: FeedItem? = null)
 
 class PaperViewModel @JvmOverloads constructor(
     application: Application,
@@ -125,7 +125,13 @@ class PaperViewModel @JvmOverloads constructor(
         mutable.update { it.copy(data = it.data.copy(profile = saved), message = "Wissensprofil dauerhaft auf diesem Gerät gespeichert.", offline = false) }
     }
     private fun List<Knowledge>.upsert(saved: Knowledge) = filterNot { it.id == saved.id } + saved
-    fun openPaper(id: String) { if (mutable.value.data.feed.items.none { it.paper_id == id }) action { val paper = repository.knowledge.paper(id); mutable.update { it.copy(extraPaper = paper) } } }
+    fun openPaper(id: String) {
+        if (mutable.value.data.feed.items.none { it.paper_id == id }) action {
+            val explanation = repository.knowledge.explanation(id)
+            val paper = if (explanation == null) repository.knowledge.paper(id) else null
+            mutable.update { it.copy(extraFeedItem = explanation, extraPaper = paper) }
+        }
+    }
     fun savePaper(id: String) = action {
         val saved = repository.knowledge.understood(id)
         mutable.update { it.copy(data = it.data.copy(knowledge = it.data.knowledge.upsert(saved)), message = "Thema dauerhaft auf diesem Gerät gespeichert.", offline = false) }

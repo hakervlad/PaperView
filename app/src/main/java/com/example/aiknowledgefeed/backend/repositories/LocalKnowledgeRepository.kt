@@ -93,9 +93,10 @@ class LocalKnowledgeRepository(val db: LocalDatabase) {
         }
     }
     suspend fun paper(id: String): Paper = dao.paper(id)?.let { gson.fromJson(it.json, Paper::class.java) } ?: throw ConnectionFailure("not_found")
+    suspend fun explanation(id: String): FeedItem? = dao.matchingFeeds("%\"paper_id\":\"$id\"%").asSequence().mapNotNull { it.json }.map { gson.fromJson(it, Feed::class.java) }.flatMap { it.items.asSequence() }.firstOrNull { it.paper_id == id }
     suspend fun understood(id: String): Knowledge = db.withTransaction {
         val paper = paper(id)
-        val explanation = dao.matchingFeeds("%\"paper_id\":\"$id\"%").asSequence().mapNotNull { it.json }.map { gson.fromJson(it, Feed::class.java) }.flatMap { it.items.asSequence() }.firstOrNull { it.paper_id == id } ?: throw ConnectionFailure("explanation_missing")
+        val explanation = explanation(id) ?: throw ConnectionFailure("explanation_missing")
         val existing = knowledge().firstOrNull { it.source_paper_id == id }
         val concept = existing ?: addConcept(paper.title.take(200), explanation.takeaway, "confirmed", paper = id)
         val confirmed = updateKnowledge(concept.id, KnowledgeUpdate(concept.name, concept.description, "confirmed"))

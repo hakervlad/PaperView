@@ -67,6 +67,32 @@ class LocalViewModelTest {
             Unit
         } finally { release.complete(Unit); store.clear(); withTimeout(10000) { vm.state.first { !it.feedGenerating } }; db.close() }
     }
+    @Test fun olderKnowledgeReopensItsStoredPersonalizedExplanation() = runBlocking {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val db = LocalDatabase.inMemory(app)
+        val repository = PaperViewRepository(app, db = db)
+        val known = repository.knowledge.addConcept("Bayes", "Bekannte Wahrscheinlichkeit", "confirmed")
+        val item = FeedItem("old-item", "old-paper", "Bayes für Biomarker", "Personalisierte frühere Erklärung", listOf(known), "Neue Methode", "Dein bestätigtes Bayes-Wissen erklärt die Unsicherheit der Methode.", "Wissen übertragen", "Bayes bewertet Biomarker.", true, "https://example.org/paper", "2026-11-07", "Wissenschaft")
+        repository.knowledge.importSnapshot(Snapshot(feed = Feed("2026-11-07", "success", listOf(item)), knowledge = listOf(known)), "old-issue")
+        repository.knowledge.understood(item.paper_id)
+        repository.knowledge.importSnapshot(Snapshot(feed = Feed("2026-11-08", "success")), "latest-issue")
+        val storage = object : SettingsStorage {
+            override suspend fun settings() = Settings()
+            override suspend fun settings(value: Settings) { }
+        }
+        val vm = PaperViewModel(app, SettingsPersistence(storage), repository)
+        val store = ViewModelStore().apply { put("vm", vm) }
+        try {
+            withTimeout(10000) { vm.state.first { !it.busy } }
+            assertTrue(vm.state.value.data.feed.items.isEmpty())
+            vm.openPaper(item.paper_id)
+            val result = withTimeout(10000) { vm.state.first { !it.busy && it.extraFeedItem != null } }
+            assertEquals(item.summary, result.extraFeedItem!!.summary)
+            assertEquals(item.connection, result.extraFeedItem!!.connection)
+            assertEquals(item.paper_id, result.extraFeedItem!!.paper_id)
+            assertNull(result.extraPaper)
+        } finally { store.clear(); db.close() }
+    }
     @Test fun profileKnowledgeAndSettingsWorkWithNoServerAndNoModel() = runBlocking {
         val app = ApplicationProvider.getApplicationContext<Application>()
         val db = LocalDatabase.inMemory(app)

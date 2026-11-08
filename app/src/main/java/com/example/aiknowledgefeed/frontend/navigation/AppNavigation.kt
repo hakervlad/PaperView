@@ -125,7 +125,7 @@ fun AppNavigation(darkTheme: Boolean, onToggleTheme: () -> Unit, modifier: Modif
                 }
                 composable(DetailRoute, arguments = listOf(navArgument("articleId") { type = NavType.StringType })) { entry ->
                     val id = entry.arguments?.getString("articleId")
-                    val article = articles.firstOrNull { it.id == id } ?: state.extraPaper?.takeIf { it.id == id }?.let { paper ->
+                    val article = articles.firstOrNull { it.id == id } ?: state.extraFeedItem?.takeIf { it.paper_id == id }?.asArticle() ?: state.extraPaper?.takeIf { it.id == id }?.let { paper ->
                         DemoArticle(paper.id, com.example.aiknowledgefeed.frontend.demo.DemoCategory.Science, paper.title, paper.abstract, emptyList(), paper.title, paper.abstract, "Keine gespeicherte personalisierte Erklärung für diese Quelle verfügbar.", "Originalquelle prüfen.", date = paper.published_at, sourceUrl = paper.url, abstractBased = true, isDemo = false)
                     }
                     if (article != null) {
