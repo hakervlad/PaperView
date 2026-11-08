@@ -59,6 +59,21 @@ class LocalFeedTest {
             assertEquals(second, repo.latestFeed())
         } finally { db.close() }
     }
+    @Test fun referencedKnowledgeRequiresAnActualConnectionExplanation() = runBlocking {
+        val db = LocalDatabase.inMemory(context); val repo = LocalKnowledgeRepository(db)
+        try {
+            val known = repo.addConcept("Bayes", "Wahrscheinlichkeit", "confirmed")
+            val model = object : ModelClient {
+                override suspend fun complete(settings: Settings, instruction: String, data: JsonElement): JsonObject {
+                    assertEquals(known.id, data.asJsonObject.getAsJsonArray("confirmed_knowledge").single().asJsonObject.get("id").asString)
+                    return JsonParser.parseString("""{"title":"Bayes","summary":"Eine allgemeine Zusammenfassung ohne Erklärung des Bezugs.","concept_ids":["${known.id}"],"new_insight":"Neue Anwendung","connection":"","relevance":"Demo","takeaway":"Neue Erkenntnis"}""").asJsonObject
+                }
+            }
+            val paper = Paper("p", "Bayes Biomarker", emptyList(), "Bayes uncertainty", "2026-11-08", "Wissenschaft", "fixture", "https://example.org/p", "preprint")
+            try { LocalPersonalizer(repo, model).explain(paper, Settings()); fail("Missing knowledge explanation accepted") }
+            catch (e: ConnectionFailure) { assertEquals("llm_invalid_json", e.code) }
+        } finally { db.close() }
+    }
     @Test fun inventedKnowledgeReferencesAreRejected() = runBlocking {
         val db = LocalDatabase.inMemory(context); val repo = LocalKnowledgeRepository(db)
         val model = object : ModelClient {
