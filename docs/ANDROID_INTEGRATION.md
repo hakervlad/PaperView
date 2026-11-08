@@ -1,3 +1,5 @@
+> Historische Serverarchitektur. Für die aktuelle eigenständige App gilt [LOCAL_ANDROID.md](LOCAL_ANDROID.md).
+
 # Android integration and verification log
 
 The existing Compose design, cards, theme and two primary tabs are retained. A settings route and a compact status/action row are added. Runtime feed/knowledge now come from the REST API, not DemoContent; fixtures remain exclusively for previews. No invented content is used as an offline fallback.

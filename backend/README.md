@@ -1,3 +1,5 @@
+> Historische Referenz: Die Android-App benötigt diesen Server nicht mehr. Aktuelle Einrichtung und Altdatenimport: [LOCAL_ANDROID.md](../docs/LOCAL_ANDROID.md).
+
 # PaperView Backend
 
 Single-user FastAPI service. SQLite stores typed JSON objects (profile, concepts, documents, page-referenced chunks/evidence, papers) plus transactional daily leases and seen identifiers. Services separate extraction, retrieval, sources, LLM and personalization. No separate cloud/graph infrastructure.

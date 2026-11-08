@@ -98,10 +98,10 @@ fun AppNavigation(darkTheme: Boolean, onToggleTheme: () -> Unit, modifier: Modif
         Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.TopCenter) {
             Column(Modifier.fillMaxSize()) {
                 Row(Modifier.fillMaxWidth()) {
-                    TextButton(onClick = { vm.generate() }, enabled = !state.busy) { Text("Feed aktualisieren") }
+                    TextButton(onClick = { vm.generate() }, enabled = !state.busy && !state.feedGenerating) { Text("Feed aktualisieren") }
                     TextButton(onClick = { navController.navigate("settings") { launchSingleTop = true } }) { Text("Einstellungen") }
                 }
-                if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                if (state.busy || state.feedGenerating) LinearProgressIndicator(Modifier.fillMaxWidth())
                 state.message?.let { Text((if (state.offline) "Offline · " else "") + it, Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall) }
             NavHost(navController = navController, startDestination = FeedRoute,
                 modifier = Modifier.widthIn(max = 760.dp).weight(1f),

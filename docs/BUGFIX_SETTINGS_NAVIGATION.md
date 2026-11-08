@@ -1,3 +1,5 @@
+> Frühere Geräteprüfungen auf Stand PR #5; sie ersetzen keine Geräteprüfung der neuen lokalen APK. Aktueller Stand: [LOCAL_ANDROID.md](LOCAL_ANDROID.md).
+
 # Bugfix: API-Key-Speicherung und Tab-Navigation
 
 ## Ursachen

@@ -19,10 +19,9 @@ import com.example.aiknowledgefeed.frontend.viewmodels.*
 @Composable
 fun SettingsScreen(vm: PaperViewModel, state: AppState, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    var backend by remember(state.settings) { mutableStateOf(state.settings.backendUrl) }
     // Secrets deliberately not placed in rememberSaveable/Android saved-instance state.
-    var token by remember(state.settings) { mutableStateOf(state.settings.token) }
-    var provider by remember(state.settings) { mutableStateOf(state.settings.provider) }
+    var provider by remember(state.settings) { mutableStateOf(state.settings.provider.takeUnless { it == "Server" } ?: "OpenAI") }
+    var directConsent by remember(state.settings) { mutableStateOf(state.settings.directApiConsent) }
     var model by remember(state.settings) { mutableStateOf(state.settings.model) }
     var base by remember(state.settings) { mutableStateOf(state.settings.llmBaseUrl) }
     var apiKeyDraft by remember { mutableStateOf("") }
@@ -43,22 +42,32 @@ fun SettingsScreen(vm: PaperViewModel, state: AppState, modifier: Modifier = Mod
             filename = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { if (it.moveToFirst()) it.getString(0) else "Dokument.pdf" } ?: "Dokument.pdf"
         }
     }
+    val archivePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) vm.importArchive(uri)
+    }
     fun parts(text: String) = text.split(',').map { it.trim() }.filter { it.isNotEmpty() }
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Einstellungen", style = MaterialTheme.typography.headlineLarge)
-        Text("Backend-Verbindung", style = MaterialTheme.typography.titleLarge)
-        OutlinedTextField(backend, { backend = it }, label = { Text("Vertrauenswürdige Backend-URL") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        OutlinedTextField(token, { token = it }, label = { Text("Backend-Zugriffsschlüssel") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(), singleLine = true)
-        Text("Lokales HTTP ist ausschließlich im Debug-Build für localhost und den Emulator erlaubt. Eigene KI-Schlüssel benötigen immer HTTPS.")
+        Text("Daten auf diesem Gerät", style = MaterialTheme.typography.titleLarge)
+        Text("Wissen, Profil, Dokumenttexte und Feed-Historie werden lokal gespeichert. Du benötigst keinen eigenen Backend-Server. Nur Paper-Suche und KI-Analyse benötigen Internet.")
         Text("KI-Modell konfigurieren", style = MaterialTheme.typography.titleLarge)
-        OutlinedTextField(provider, { provider = it }, label = { Text("Anbieter (z. B. DeepSeek oder Server)") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(model, { model = it }, label = { Text("Modellname (leer: Server-Vorgabe)") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(base, { base = it }, label = { Text("KI-Basis-URL (optional, serverseitig freizugeben)") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(provider, { provider = it }, label = { Text("Anbieter (z. B. OpenAI)") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(model, { model = it }, label = { Text("Exakter Modellname") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(base, { base = it }, label = { Text("HTTPS-KI-Basis-URL (leer: OpenAI)") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(apiKeyDraft, { apiKeyDraft = it }, label = { Text("Eigener API-Key (optional)") }, supportingText = { if (state.settings.apiKey.isNotBlank()) Text("API-Key gespeichert") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(), singleLine = true)
-        Text("Modellaufrufe können Kosten verursachen. Der ausgewählte Anbieter erhält relevante Wissenseinträge und Paperinformationen. Dein Backend erhält den eigenen API-Key nur für Modellaufrufe.")
-        Button(onClick = { vm.configure(Settings(backend.trim(), token.trim(), provider, model.trim(), base.trim(), apiKeyDraft.trim())) }, enabled = !state.settingsSaving) { Text("Verbindungseinstellungen speichern") }
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Checkbox(checked = directConsent, onCheckedChange = { directConsent = it })
+            Text("Direkte KI-Verbindung für diese private Testversion erlauben")
+        }
+        Text("Dein API-Key wird mit einem Schlüssel aus dem Android Keystore verschlüsselt gespeichert. Auf kompromittierten Geräten kann er beim Gebrauch dennoch entwendet werden. Kein gemeinsamer Betreiber-Key ist enthalten.")
+        Text("Der Anbietername dient als Bezeichnung. Entscheidend sind die KI-Basis-URL und der exakte Modellname. Modellaufrufe können Kosten verursachen. Der ausgewählte Anbieter erhält relevante Wissenseinträge und Paperinformationen. Dein Schlüssel wird nur direkt an den bewusst konfigurierten HTTPS-Modellanbieter gesendet. Lokales Wissen bleibt ohne KI-Verbindung nutzbar.")
+        Button(onClick = { vm.configure(state.settings.copy(provider = provider, model = model.trim(), llmBaseUrl = base.trim(), apiKey = apiKeyDraft.trim(), directApiConsent = directConsent)) }, enabled = !state.settingsSaving) { Text("KI-Einstellungen speichern") }
         TextButton(onClick = { apiKeyDraft = ""; vm.configure(state.settings.copy(apiKey = ""), clearApiKey = true) }, enabled = !state.settingsSaving) { Text("Gespeicherten KI-Schlüssel löschen") }
-        Button(onClick = vm::test, enabled = !state.busy) { Text("Gespeicherte Verbindung testen") }
+        Button(onClick = vm::test, enabled = !state.busy && !state.settingsSaving) { Text("Gespeicherte Verbindung testen") }
+        state.connectionSteps.forEach { step ->
+            Text("${step.title}: ${step.status}", style = MaterialTheme.typography.titleSmall)
+            if (step.detail.isNotBlank()) Text(step.detail, style = MaterialTheme.typography.bodySmall)
+        }
         HorizontalDivider()
         Text("Persönliches Wissen", style = MaterialTheme.typography.titleLarge)
         OutlinedTextField(subject, { subject = it }, label = { Text("Studiengang / Bachelorfach") }, modifier = Modifier.fillMaxWidth())
@@ -73,23 +82,26 @@ fun SettingsScreen(vm: PaperViewModel, state: AppState, modifier: Modifier = Mod
         Button(onClick = { vm.profile(Profile(subject, parts(focus), parts(interests), parts(familiar), count.toInt(), days.toInt())) }, enabled = !state.busy) { Text("Wissensprofil speichern") }
         HorizontalDivider()
         Text("Wissen importieren", style = MaterialTheme.typography.titleLarge)
-        Text("Nur eigene oder berechtigt verwendete textbasierte PDFs (maximal 10 MB). Ein Upload überträgt die Datei an dein Backend, noch nicht an einen KI-Anbieter.")
+        Text("Nur eigene oder berechtigt verwendete textbasierte PDFs (maximal 10 MB). Import und Textextraktion erfolgen auf diesem Gerät. Kein Upload an einen Server.")
         Button(onClick = { picker.launch(arrayOf("application/pdf")) }, enabled = !state.busy) { Text("PDF auswählen") }
         if (selectedUri != null) {
             Text("Ausgewählt: $filename")
-            Button(onClick = { vm.upload(android.net.Uri.parse(selectedUri)); selectedUri = null }, enabled = !state.busy) { Text("Upload und Textextraktion bestätigen") }
+            Button(onClick = { vm.upload(android.net.Uri.parse(selectedUri)) }, enabled = !state.busy) { Text("Lokal importieren und Text extrahieren") }
         }
         state.data.documents.forEach { document ->
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(document.filename, style = MaterialTheme.typography.titleMedium)
-                    Text("Status: " + when (document.status) { "uploaded", "extracted" -> "Text extrahiert"; "analyzed", "completed" -> "Konzepte ermittelt"; "processing" -> "Verarbeitung läuft"; "failed", "error" -> "Verarbeitung fehlgeschlagen"; else -> document.status })
+                    Text("Status: " + when (document.status) { "uploaded", "extracted" -> "Text extrahiert"; "analyzed", "completed" -> "Konzepte ermittelt"; "processing" -> "Verarbeitung läuft"; "failed", "error" -> "Verarbeitung fehlgeschlagen"; "needs_text" -> "Textabschnitte fehlen auf diesem Gerät"; else -> document.status })
                     document.message?.let { Text(it) }
-                    Button(onClick = { consentDocument = document.id }, enabled = !state.busy) { Text("Konzepte mit KI ermitteln") }
+                    Button(onClick = { consentDocument = document.id }, enabled = !state.busy && document.status != "needs_text") { Text("Konzepte mit KI ermitteln") }
                     TextButton(onClick = { vm.removeDocument(document.id) }, enabled = !state.busy) { Text("Dokument und zugehörige Belege löschen") }
                 }
             }
         }
+        Text("Vorhandene Daten übernehmen", style = MaterialTheme.typography.titleLarge)
+        Text("Der alte verschlüsselte App-Cache wird automatisch übernommen. Ein privat exportiertes PaperView-Serverarchiv kannst du zusätzlich als JSON importieren. Bestehende lokale Inhalte bleiben erhalten.")
+        Button(onClick = { archivePicker.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }, enabled = !state.busy) { Text("Alte Serverdaten importieren") }
         Text("Konzepte prüfen und bearbeiten", style = MaterialTheme.typography.titleLarge)
         Text("Aus Dokumenten abgeleitete Konzepte gelten erst nach deiner Bestätigung als Vorwissen.")
         state.data.knowledge.forEach { concept ->
@@ -109,7 +121,7 @@ fun SettingsScreen(vm: PaperViewModel, state: AppState, modifier: Modifier = Mod
     }
     consentDocument?.let { id ->
         AlertDialog(onDismissRequest = { consentDocument = null }, title = { Text("Externe KI-Verarbeitung erlauben?") },
-            text = { Text("Benötigte Textabschnitte dieses Dokuments werden über dein Backend an den konfigurierten KI-Anbieter gesendet. Dies kann vertrauliche Inhalte übertragen und Kosten verursachen. Bestätige nur, wenn du dafür berechtigt bist.") },
+            text = { Text("Maximal zwölf benötigte Textabschnitte dieses lokal gespeicherten Dokuments werden direkt über HTTPS an den konfigurierten KI-Anbieter gesendet. Dies kann vertrauliche Inhalte übertragen und Kosten verursachen. Bestätige nur, wenn du dafür berechtigt bist.") },
             confirmButton = { TextButton(onClick = { consentDocument = null; vm.analyze(id) }) { Text("Zustimmen und analysieren") } },
             dismissButton = { TextButton(onClick = { consentDocument = null }) { Text("Abbrechen") } })
     }

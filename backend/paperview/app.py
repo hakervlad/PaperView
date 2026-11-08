@@ -1,4 +1,7 @@
 import hmac
+import logging
+
+logger = logging.getLogger("paperview.api")
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter, Depends, Request, UploadFile, File, Response
 from fastapi.exceptions import RequestValidationError
@@ -46,6 +49,7 @@ def create_app(settings=None):
         return JSONResponse({'error':{'code':'http_error','message':'Anfrage nicht möglich.'}},status_code=exc.status_code)
     @app.exception_handler(Exception)
     async def internal_error(request,exc):
+        logger.error('request_failed type=%s', type(exc).__name__)
         return JSONResponse({'error':{'code':'internal_error','message':'Interner Fehler. Bitte später erneut versuchen.'}},status_code=500)
 
     async def auth(request:Request):
