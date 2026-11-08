@@ -1,3 +1,5 @@
+> Historische Serverarchitektur. Für die aktuelle eigenständige App gilt [LOCAL_ANDROID.md](LOCAL_ANDROID.md).
+
 # Backend-Verbindung und dauerhafte Wissensspeicherung
 
 Stand: 8. November 2026. Ausgangspunkt: `dev` einschließlich PR #5. Navigation, Theme und bestehende Feed-/Wissens-Cards bleiben unverändert. Ergänzt werden nur notwendige Diagnosetexte in den Einstellungen.

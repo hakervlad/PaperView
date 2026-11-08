@@ -92,9 +92,9 @@ fun SettingsScreen(vm: PaperViewModel, state: AppState, modifier: Modifier = Mod
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(document.filename, style = MaterialTheme.typography.titleMedium)
-                    Text("Status: " + when (document.status) { "uploaded", "extracted" -> "Text extrahiert"; "analyzed", "completed" -> "Konzepte ermittelt"; "processing" -> "Verarbeitung läuft"; "failed", "error" -> "Verarbeitung fehlgeschlagen"; else -> document.status })
+                    Text("Status: " + when (document.status) { "uploaded", "extracted" -> "Text extrahiert"; "analyzed", "completed" -> "Konzepte ermittelt"; "processing" -> "Verarbeitung läuft"; "failed", "error" -> "Verarbeitung fehlgeschlagen"; "needs_text" -> "Textabschnitte fehlen auf diesem Gerät"; else -> document.status })
                     document.message?.let { Text(it) }
-                    Button(onClick = { consentDocument = document.id }, enabled = !state.busy) { Text("Konzepte mit KI ermitteln") }
+                    Button(onClick = { consentDocument = document.id }, enabled = !state.busy && document.status != "needs_text") { Text("Konzepte mit KI ermitteln") }
                     TextButton(onClick = { vm.removeDocument(document.id) }, enabled = !state.busy) { Text("Dokument und zugehörige Belege löschen") }
                 }
             }

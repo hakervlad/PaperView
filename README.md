@@ -1,23 +1,25 @@
 # 🧠 PaperView
 
-### Neue KI-Forschung. Erklärt mit deinem Wissen.
+### Neue Forschung. Erklärt mit deinem Wissen.
 
-**Android · Kotlin · Jetpack Compose · In Planung**
-
-PaperView ist das Konzept für einen persönlichen KI-Forschungsfeed: Die App verbindet aktuelle wissenschaftliche Veröffentlichungen mit dem, was du bereits weißt – und lernt mit dir weiter.
-
----
+**Android · Kotlin · Jetpack Compose · Room · Private Testversion**
 
 ### 📄 Importieren → 🧩 Verknüpfen → 💡 Verstehen
 
-- **Dein Wissen als Ausgangspunkt:** PDFs importieren, vorgeschlagene Konzepte prüfen und deine Wissensbasis aufbauen.
-- **Täglich neue Forschung:** Ein deutschsprachiger Feed mit sieben kurzen Beiträgen aus aktuellen arXiv-Papers – passend zu deinem Wissensstand und mit Originalquellen.
-- **Bei Interesse tiefer einsteigen:** Paper verständlich erklären lassen und neue Erkenntnisse nach deiner Bestätigung dauerhaft übernehmen.
+- **Dein Wissen als Ausgangspunkt:** PDFs lokal importieren, erkannte Konzepte prüfen und bewusst bestätigen.
+- **Neue Forschung einordnen:** OpenAlex und arXiv direkt abfragen; deutsche Erklärungen verbinden Abstracts mit passendem, bestätigtem Vorwissen.
+- **Wissen behalten:** Verstandene Themen, Quellen und Tagesausgaben dauerhaft auf dem Smartphone speichern.
 
-### 📱 Lokal gespeichert. Flexibel verbunden.
+### 📱 Eigenständig auf deinem Smartphone
 
-Wissensbasis, Dokumente und gespeicherte Beiträge bleiben auf deinem Smartphone und sind offline verfügbar. Ein eigener Server ist nicht nötig.
+Kein eigener Server, PC oder VPS erforderlich. Profil, PDF-Texte und Wissenssammlung funktionieren lokal; gespeicherte Feeds bleiben offline lesbar. Nur wissenschaftliche APIs und externe KI benötigen Internet.
 
-Für Recherche und KI werden externe APIs genutzt. Du wählst Anbieter und Modell und hinterlegst deinen eigenen API-Key. Benötigtes Wissen und Paperinhalte werden dabei an den gewählten KI-Anbieter übertragen; API-Kosten können entstehen.
+Für die private KI-Testversion hinterlegst du deinen eigenen Schlüssel, erlaubst die direkte HTTPS-Anbindung und wählst einen verfügbaren Modellnamen. Der Schlüssel wird mit Android Keystore geschützt. Externe Aufrufe können Kosten verursachen; mobile Schlüssel haben Sicherheitsgrenzen. Ein öffentlicher Release benötigt einen abgesicherten Modell-Gateway.
 
-> **Das Ziel:** Jeder neue Feed baut auf deinem wachsenden Wissen auf.
+**[Einrichten, Altdaten übernehmen und Sicherheitsgrenzen verstehen →](docs/LOCAL_ANDROID.md)**
+
+```sh
+./gradlew :app:assembleDebug
+```
+
+> Jede neue Erklärung soll an nachvollziehbar gespeichertes Wissen anknüpfen. Ohne passenden Bezug wird keiner erfunden.

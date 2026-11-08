@@ -48,3 +48,8 @@
 - Ergebnisse/Einschränkungen und Upgrade-Anleitung dokumentieren, reguläre APK erzeugen, Branch/PR nach Prüfungen integrieren. Issue #1 bei offenen Live-Akzeptanzkriterien offen lassen.
 
 Die Architektur ist durch die ausdrückliche Vorgabe des Nutzers festgelegt. Keine erneute Freigabe routinemäßiger Implementierungsentscheidungen erforderlich; Umsetzung durch Codex, keine DeepSeek-Worker.
+
+
+## Umsetzungsstand
+
+Lokale Room-/PDF-/Quellen-/Modell-/Feed-Komponenten und Frontend-Anbindung implementiert. Einmalige Cache-Übernahme und privater Serverarchiv-Import vorhanden. Aktueller Teststand, Grenzen und Installation: [LOCAL_ANDROID.md](../LOCAL_ANDROID.md). Neue Gerätetests wurden auf Wunsch vertagt; Live-KI ohne bereitgestellten privaten Testschlüssel nicht behauptet. Keine DeepSeek-Worker gestartet.

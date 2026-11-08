@@ -22,6 +22,51 @@ import java.time.LocalDate
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class LocalViewModelTest {
+    @Test fun failedSecureSettingsLoadDoesNotHideLocalKnowledge() = runBlocking {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val db = LocalDatabase.inMemory(app)
+        val repository = PaperViewRepository(app, db = db)
+        val known = repository.knowledge.addConcept("Bayes", "Lokal und offline", "confirmed")
+        val storage = object : SettingsStorage {
+            override suspend fun settings(): Settings = throw java.io.IOException("fixture-sensitive-settings")
+            override suspend fun settings(value: Settings) = error("Must not overwrite")
+        }
+        val vm = PaperViewModel(app, SettingsPersistence(storage), repository)
+        val store = ViewModelStore().apply { put("vm", vm) }
+        try {
+            val state = withTimeout(10000) { vm.state.first { !it.busy } }
+            assertTrue(state.data.knowledge.any { it.id == known.id })
+            assertTrue(state.message!!.contains("Einstellungen")); assertFalse(state.message!!.contains("fixture-sensitive"))
+        } finally { store.clear(); db.close() }
+    }
+    @Test fun localProfileCanBeSavedWhileFeedIsWaitingForNetwork() = runBlocking {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val db = LocalDatabase.inMemory(app)
+        val started = CompletableDeferred<Unit>(); val release = CompletableDeferred<Unit>()
+        val source = object : PaperSource {
+            override suspend fun search(profile: Profile, known: List<Knowledge>, day: LocalDate): PaperSearchResult {
+                started.complete(Unit); release.await(); return PaperSearchResult(emptyList())
+            }
+        }
+        val repository = PaperViewRepository(app, db = db, source = source)
+        val storage = object : SettingsStorage {
+            override suspend fun settings() = Settings()
+            override suspend fun settings(value: Settings) { }
+        }
+        val vm = PaperViewModel(app, SettingsPersistence(storage), repository)
+        val store = ViewModelStore().apply { put("vm", vm) }
+        try {
+            withTimeout(10000) { vm.state.first { !it.busy } }
+            vm.generate(); withTimeout(10000) { started.await() }
+            assertTrue(vm.state.value.feedGenerating)
+            vm.profile(Profile(bachelor_subject = "Offline unabhängig"))
+            withTimeout(10000) { vm.state.first { !it.busy && it.data.profile.bachelor_subject == "Offline unabhängig" } }
+            assertEquals("Offline unabhängig", repository.knowledge.profile().bachelor_subject)
+            assertTrue(vm.state.value.feedGenerating)
+            release.complete(Unit); withTimeout(10000) { vm.state.first { !it.feedGenerating } }
+            Unit
+        } finally { release.complete(Unit); store.clear(); withTimeout(10000) { vm.state.first { !it.feedGenerating } }; db.close() }
+    }
     @Test fun profileKnowledgeAndSettingsWorkWithNoServerAndNoModel() = runBlocking {
         val app = ApplicationProvider.getApplicationContext<Application>()
         val db = LocalDatabase.inMemory(app)

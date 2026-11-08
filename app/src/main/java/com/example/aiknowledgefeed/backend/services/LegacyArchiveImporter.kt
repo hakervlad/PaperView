@@ -52,16 +52,12 @@ class LegacyArchiveImporter(private val knowledge: LocalKnowledgeRepository) {
             val marker = "archive:$hash"
             return knowledge.db.withTransaction {
                 if (knowledge.dao.metadata(marker) != null) return@withTransaction Report(0, 0, 0, true)
-                val beforeConcepts = knowledge.knowledge().size; val beforeDocuments = knowledge.documents().size; val beforeFeeds = knowledge.dao.successfulFeeds().size
+                val beforeConcepts = knowledge.knowledge().size; val beforeDocuments = knowledge.documents().size; val beforeFeeds = knowledge.dao.successfulFeedCount()
                 val currentConcepts = knowledge.dao.knowledge()
                 concepts.forEach { old -> require(currentConcepts.none { it.id == old.id && it.normalizedName != normalized(old.name) }) }
                 documents.forEach { old -> require(knowledge.dao.documents().none { it.id == old.id && it.filename != old.filename }) }
                 val paperMapping = mutableMapOf<String, String>()
-                papers.forEach { old ->
-                    val existing = knowledge.dao.papers().map { knowledge.gson.fromJson(it.json, Paper::class.java) }.firstOrNull { ScientificSources.identifiers(it).intersect(ScientificSources.identifiers(old)).isNotEmpty() }
-                    paperMapping[old.id] = existing?.id ?: old.id
-                    if (existing == null) knowledge.dao.paper(PaperRow(old.id, ScientificSources.doi(old.doi), ScientificSources.arxivId(old.arxiv_id), knowledge.gson.toJson(old)))
-                }
+                papers.forEach { old -> paperMapping[old.id] = knowledge.storePaper(old).id }
                 val mappedConcepts = concepts.map { it.copy(source_paper_id = it.source_paper_id?.let { id -> paperMapping[id] ?: id }) }
                 knowledge.importSnapshot(Snapshot(knowledge = mappedConcepts, profile = profile, documents = documents), "$marker:snapshot")
                 val conceptMap = concepts.associate { old -> old.id to knowledge.knowledge().first { normalized(it.name) == normalized(old.name) }.id }
@@ -69,6 +65,10 @@ class LegacyArchiveImporter(private val knowledge: LocalKnowledgeRepository) {
                     require(knowledge.dao.documents().any { it.id == chunk.documentId })
                     val existing = knowledge.dao.chunks(chunk.documentId).firstOrNull { it.id == chunk.id }
                     if (existing == null) knowledge.dao.chunks(listOf(chunk)) else require(existing.text == chunk.text && existing.page == chunk.page)
+                }
+                documents.forEach { imported ->
+                    val row = knowledge.dao.documents().first { it.id == imported.id }
+                    if (row.status == "needs_text" && knowledge.dao.chunks(imported.id).isNotEmpty()) knowledge.dao.document(row.copy(status = imported.status, message = imported.message))
                 }
                 evidence.forEach { row ->
                     val target = conceptMap[row.conceptId] ?: throw IllegalArgumentException()
@@ -88,7 +88,7 @@ class LegacyArchiveImporter(private val knowledge: LocalKnowledgeRepository) {
                 }
                 seen.forEach { knowledge.dao.seen(SeenRow(it)) }
                 knowledge.dao.metadata(MetadataRow(marker, "done")); knowledge.changed()
-                Report(knowledge.knowledge().size - beforeConcepts, knowledge.documents().size - beforeDocuments, knowledge.dao.successfulFeeds().size - beforeFeeds)
+                Report(knowledge.knowledge().size - beforeConcepts, knowledge.documents().size - beforeDocuments, knowledge.dao.successfulFeedCount() - beforeFeeds)
             }
         } catch (e: CancellationException) { throw e }
         catch (_: Exception) { throw ConnectionFailure("archive_invalid") }

@@ -47,6 +47,16 @@ class LocalPersistenceTest {
             assertEquals("Biologie", repo.profile().bachelor_subject)
         } finally { db.close() }
     }
+    @Test fun cachedDocumentMetadataDoesNotPretendPdfTextIsAlreadyLocal() = runBlocking {
+        val db = LocalDatabase.inMemory(context); val repo = LocalKnowledgeRepository(db)
+        try {
+            repo.importSnapshot(Snapshot(documents = listOf(Document("legacy-doc", "thesis.pdf", "extracted"))), "legacy-document")
+            val document = repo.documents().single()
+            assertEquals("needs_text", document.status)
+            assertTrue(document.message!!.contains("Textabschnitte fehlen"))
+            assertTrue(repo.dao.chunks(document.id).isEmpty())
+        } finally { db.close() }
+    }
     @Test fun pdfImportIsLocalAndDeduplicatedAndRequiresConsentBeforeModelUse() = runBlocking {
         val db = LocalDatabase.inMemory(context); val repo = LocalKnowledgeRepository(db)
         var calls = 0
@@ -64,7 +74,12 @@ class LocalPersistenceTest {
             assertEquals(0, calls)
             try { service.analyze(document.id, true, Settings()); fail("Model failure") } catch (e: ConnectionFailure) { assertEquals("llm_unavailable", e.code) }
             assertEquals("extracted", repo.documents().single().status); assertTrue(repo.knowledge().isEmpty())
-            for ((input, code) in listOf(ByteArray(0) to "pdf_empty", "%PDF- broken".toByteArray() to "pdf_malformed", ByteArray(10 * 1024 * 1024 + 1) to "upload_too_large")) {
+            fun blankPdf(pages: Int): ByteArray {
+                val output = java.io.ByteArrayOutputStream()
+                com.tom_roush.pdfbox.pdmodel.PDDocument().use { pdf -> repeat(pages) { pdf.addPage(com.tom_roush.pdfbox.pdmodel.PDPage()) }; pdf.save(output) }
+                return output.toByteArray()
+            }
+            for ((input, code) in listOf(blankPdf(1) to "pdf_no_text", blankPdf(101) to "pdf_pages", ByteArray(0) to "pdf_empty", "%PDF- broken".toByteArray() to "pdf_malformed", ByteArray(10 * 1024 * 1024 + 1) to "upload_too_large")) {
                 try { service.importDocument(input, "bad.pdf"); fail(code) } catch (e: ConnectionFailure) { assertEquals(code, e.code) }
             }
             assertEquals(1, repo.documents().size)

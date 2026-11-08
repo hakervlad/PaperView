@@ -44,9 +44,14 @@ interface LocalDao {
     @Insert suspend fun chunks(rows: List<ChunkRow>)
     @Query("SELECT * FROM papers WHERE id = :id") suspend fun paper(id: String): PaperRow?
     @Query("SELECT * FROM papers") suspend fun papers(): List<PaperRow>
+    @Query("SELECT * FROM papers WHERE id = :id OR doi = :doi OR arxivId = :arxiv LIMIT 1") suspend fun matchingPaper(id: String, doi: String?, arxiv: String?): PaperRow?
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun paper(row: PaperRow): Long
+    @Update suspend fun updatePaper(row: PaperRow)
     @Query("SELECT * FROM feeds WHERE day = :day") suspend fun feed(day: String): FeedRow?
     @Query("SELECT * FROM feeds WHERE status = 'success' ORDER BY day DESC") suspend fun successfulFeeds(): List<FeedRow>
+    @Query("SELECT * FROM feeds WHERE status = 'success' ORDER BY day DESC LIMIT 1") suspend fun latestSuccessfulFeed(): FeedRow?
+    @Query("SELECT * FROM feeds WHERE status = 'success' AND json LIKE :pattern ORDER BY day DESC") suspend fun matchingFeeds(pattern: String): List<FeedRow>
+    @Query("SELECT COUNT(*) FROM feeds WHERE status = 'success'") suspend fun successfulFeedCount(): Int
     @Upsert suspend fun feed(row: FeedRow)
     @Query("SELECT identifier FROM seen") suspend fun seen(): List<String>
     @Insert(onConflict = OnConflictStrategy.IGNORE) suspend fun seen(row: SeenRow)

@@ -1,3 +1,5 @@
+> Historische Serverarchitektur. Für die aktuelle eigenständige App gilt [LOCAL_ANDROID.md](LOCAL_ANDROID.md).
+
 # PaperView: Backend integration
 
 ## Scope and phases

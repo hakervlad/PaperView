@@ -42,14 +42,7 @@ class LocalFeedService(
                 val terms = tokens((confirmed.map { it.name } + profile.interests + profile.focus_areas).joinToString(" "))
                 val seen = knowledge.dao.seen().toSet()
                 val candidates = knowledge.db.withTransaction {
-                    val existing = knowledge.dao.papers().map { knowledge.gson.fromJson(it.json, Paper::class.java) }.toMutableList()
-                    ScientificSources.deduplicate(search.papers).map { fresh ->
-                        val match = existing.firstOrNull { ScientificSources.identifiers(it).intersect(ScientificSources.identifiers(fresh)).isNotEmpty() }
-                        val canonical = if (match == null) fresh else fresh.copy(id = match.id, doi = fresh.doi ?: match.doi, arxiv_id = fresh.arxiv_id ?: match.arxiv_id)
-                        knowledge.dao.paper(PaperRow(canonical.id, ScientificSources.doi(canonical.doi), ScientificSources.arxivId(canonical.arxiv_id), knowledge.gson.toJson(canonical)))
-                        if (match == null) existing += canonical
-                        canonical
-                    }
+                    ScientificSources.deduplicate(search.papers).map { knowledge.storePaper(it) }
                 }
                 val selected = candidates.filter { paper ->
                     paper.abstract.isNotBlank() && ScientificSources.identifiers(paper).intersect(seen).isEmpty()

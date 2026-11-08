@@ -28,9 +28,16 @@ class PaperViewModel @JvmOverloads constructor(
     init {
         operationJob = viewModelScope.launch(Dispatchers.IO) {
             try {
-                val settings = settingsPersistence.load()
+                var settingsWarning: String? = null
+                val settings = try { settingsPersistence.load() }
+                catch (e: CancellationException) { throw e }
+                catch (e: Exception) {
+                    Log.w("PaperView", "settings_load_failed type=${e.javaClass.simpleName}")
+                    settingsWarning = "Sicher gespeicherte Einstellungen konnten nicht geladen werden. Lokales Wissen bleibt verfügbar; vorhandene Schlüssel werden nicht überschrieben."
+                    Settings()
+                }
                 mutable.update { it.copy(settings = settings) }
-                val warning = repository.initialize()
+                val warning = listOfNotNull(settingsWarning, repository.initialize()).joinToString(" ").ifBlank { null }
                 val snapshot = repository.snapshot()
                 mutable.update { it.copy(data = snapshot, message = warning) }
                 observe()
@@ -55,8 +62,8 @@ class PaperViewModel @JvmOverloads constructor(
     }
     private fun fail(error: Exception) {
         // No exception text, request/response bodies, keys or URLs in logs.
-        Log.w("PaperView", "operation_failed type=${error.javaClass.simpleName}")
         val code = FailureMessages.code(error)
+        Log.w("PaperView", "operation_failed type=${error.javaClass.simpleName} reason=${FailureMessages.message(code)}")
         val offline = code in setOf("source_unavailable", "llm_unavailable", "llm_timeout", "network_error", "dns_error")
         mutable.update { it.copy(message = FailureMessages.message(code), offline = offline) }
     }

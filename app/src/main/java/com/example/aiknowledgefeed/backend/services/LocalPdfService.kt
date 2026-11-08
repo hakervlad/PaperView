@@ -62,14 +62,14 @@ class LocalPdfService(context: Context, private val knowledge: LocalKnowledgeRep
         val document = knowledge.documents().firstOrNull { it.id == id } ?: throw ConnectionFailure("not_found")
         if (document.status == "analyzed") return document
         val chunks = knowledge.dao.chunks(id).take(12)
-        if (chunks.isEmpty()) throw ConnectionFailure("pdf_no_text")
+        if (chunks.isEmpty()) throw ConnectionFailure(if (document.status == "needs_text") "document_text_missing" else "pdf_no_text")
         val data = JsonArray().apply { chunks.forEach { add(JsonObject().apply { addProperty("page", it.page); addProperty("text", it.text) }) } }
         val answer = model.complete(settings, "Schema: {\"concepts\":[{\"name\":str,\"description\":str,\"pages\":[int],\"connections\":[concept_name]}]}. Maximal 30 belegte Begriffe mit Seitenbeleg. Erwähnung bedeutet kein bestätigtes Wissen.", data)
         data class Candidate(val name: String, val description: String, val pages: List<Int>, val connections: List<String>)
         val candidates = try {
             answer.getAsJsonArray("concepts").also { require(it.size() <= 30) }.map { element ->
                 val c = element.asJsonObject
-                Candidate(c.get("name").asString, c.get("description").asString, c.getAsJsonArray("pages").map { it.asInt }, c.getAsJsonArray("connections").map { it.asString })
+                Candidate(c.get("name").asString, c.get("description").asString, c.getAsJsonArray("pages").map { it.asString.toInt() }, c.getAsJsonArray("connections").map { it.asString })
             }.also { all ->
                 require(all.map { normalized(it.name) }.distinct().size == all.size)
                 all.forEach { c ->

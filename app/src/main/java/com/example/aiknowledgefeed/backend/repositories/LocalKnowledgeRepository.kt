@@ -1,6 +1,7 @@
 package com.example.aiknowledgefeed.backend.repositories
 
 import androidx.room.withTransaction
+import com.example.aiknowledgefeed.backend.api.ScientificSources
 import com.example.aiknowledgefeed.backend.database.*
 import com.example.aiknowledgefeed.backend.models.*
 import com.example.aiknowledgefeed.backend.services.ConnectionFailure
@@ -32,7 +33,7 @@ class LocalKnowledgeRepository(val db: LocalDatabase) {
         val knowledge = knowledge()
         return dao.documents().map { Document(it.id, it.filename, it.status, it.message, knowledge.filter { k -> it.id in k.document_ids }) }
     }
-    suspend fun latestFeed(): Feed = dao.successfulFeeds().firstOrNull()?.json?.let { gson.fromJson(it, Feed::class.java) } ?: Feed()
+    suspend fun latestFeed(): Feed = dao.latestSuccessfulFeed()?.json?.let { gson.fromJson(it, Feed::class.java) } ?: Feed()
     suspend fun snapshot() = db.withTransaction { Snapshot(latestFeed(), knowledge(), profile(), documents()) }
     suspend fun addConcept(name: String, description: String = "", status: String = "candidate", id: String = localId(), paper: String? = null): Knowledge = db.withTransaction {
         require(name.isNotBlank() && name.length <= 200 && description.length <= 6000)
@@ -74,10 +75,27 @@ class LocalKnowledgeRepository(val db: LocalDatabase) {
         val neighbors = ranked.flatMap { it.connections }.toSet()
         return (ranked + all.filter { it.id in neighbors && it.id !in ranked.map { k -> k.id } }.take(2)).take(8)
     }
+    suspend fun storePaper(value: Paper): Paper = db.withTransaction {
+        val doi = ScientificSources.doi(value.doi); val arxiv = ScientificSources.arxivId(value.arxiv_id)
+        val previous = dao.matchingPaper(value.id, doi, arxiv)?.let { gson.fromJson(it.json, Paper::class.java) }
+        if (previous == null) {
+            val normalized = value.copy(doi = doi, arxiv_id = arxiv)
+            dao.paper(PaperRow(normalized.id, doi, arxiv, gson.toJson(normalized)))
+            normalized
+        } else {
+            // Cache placeholders contain a generated headline, not the original metadata.
+            // Enrich them from an explicit archive/source without changing knowledge text.
+            val base = if (previous.source.startsWith("legacy-") && previous.abstract.isBlank()) value.copy(id = previous.id)
+                else previous.copy(abstract = previous.abstract.ifBlank { value.abstract }, authors = previous.authors.ifEmpty { value.authors })
+            val merged = base.copy(doi = ScientificSources.doi(previous.doi) ?: doi, arxiv_id = ScientificSources.arxivId(previous.arxiv_id) ?: arxiv, pdf_url = previous.pdf_url ?: value.pdf_url)
+            if (merged != previous) dao.updatePaper(PaperRow(merged.id, merged.doi, merged.arxiv_id, gson.toJson(merged)))
+            merged
+        }
+    }
     suspend fun paper(id: String): Paper = dao.paper(id)?.let { gson.fromJson(it.json, Paper::class.java) } ?: throw ConnectionFailure("not_found")
     suspend fun understood(id: String): Knowledge = db.withTransaction {
         val paper = paper(id)
-        val explanation = dao.successfulFeeds().asSequence().mapNotNull { it.json }.map { gson.fromJson(it, Feed::class.java) }.flatMap { it.items.asSequence() }.firstOrNull { it.paper_id == id } ?: throw ConnectionFailure("explanation_missing")
+        val explanation = dao.matchingFeeds("%\"paper_id\":\"$id\"%").asSequence().mapNotNull { it.json }.map { gson.fromJson(it, Feed::class.java) }.flatMap { it.items.asSequence() }.firstOrNull { it.paper_id == id } ?: throw ConnectionFailure("explanation_missing")
         val existing = knowledge().firstOrNull { it.source_paper_id == id }
         val concept = existing ?: addConcept(paper.title.take(200), explanation.takeaway, "confirmed", paper = id)
         val confirmed = updateKnowledge(concept.id, KnowledgeUpdate(concept.name, concept.description, "confirmed"))
@@ -94,7 +112,7 @@ class LocalKnowledgeRepository(val db: LocalDatabase) {
     suspend fun importSnapshot(snapshot: Snapshot, marker: String) = db.withTransaction {
         if (dao.metadata(marker) != null) return@withTransaction
         if (dao.profile() == null || profile() == Profile()) saveProfile(snapshot.profile)
-        snapshot.documents.forEach { if (dao.documents().none { d -> d.id == it.id }) dao.document(DocumentRow(it.id, it.filename, it.status, it.message)) }
+        snapshot.documents.forEach { if (dao.documents().none { d -> d.id == it.id }) dao.document(DocumentRow(it.id, it.filename, "needs_text", "Aus altem Cache übernommen. Textabschnitte fehlen auf diesem Gerät; Serverarchiv importieren oder PDF erneut lokal auswählen.")) }
         val mapping = mutableMapOf<String, String>()
         snapshot.knowledge.forEach { old ->
             val existing = dao.knowledge().firstOrNull { it.id == old.id || it.normalizedName == normalized(old.name) }

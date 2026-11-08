@@ -27,8 +27,12 @@ data class PaperSearchResult(val papers: List<Paper>, val warnings: List<String>
 
 class ScientificSources(private val client: OkHttpClient = OkHttpClient.Builder()
     .connectTimeout(15, TimeUnit.SECONDS).readTimeout(25, TimeUnit.SECONDS).callTimeout(40, TimeUnit.SECONDS)
-    .followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false).build()) : PaperSource {
+    .followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false).build(),
+    private val openAlexEndpoint: String = "https://api.openalex.org/works",
+    private val arxivEndpoint: String = "https://export.arxiv.org/api/query",
+) : PaperSource {
     private suspend fun request(url: String, params: Map<String, String>): String {
+        if (!url.toHttpUrl().isHttps) throw ConnectionFailure("https_required")
         val request = Request.Builder().url(url.toHttpUrl().newBuilder().apply { params.forEach { (k, v) -> addQueryParameter(k, v) } }.build())
             .header("User-Agent", "PaperView/1.0 (private scientific reading app)").build()
         try {
@@ -40,7 +44,7 @@ class ScientificSources(private val client: OkHttpClient = OkHttpClient.Builder(
         catch (e: ConnectionFailure) { throw e }
         catch (_: IOException) { throw ConnectionFailure("source_unavailable") }
     }
-    suspend fun openAlex(query: String, start: LocalDate, end: LocalDate): List<Paper> = parseOpenAlex(request("https://api.openalex.org/works", mapOf(
+    suspend fun openAlex(query: String, start: LocalDate, end: LocalDate): List<Paper> = parseOpenAlex(request(openAlexEndpoint, mapOf(
         "filter" to "from_publication_date:$start,to_publication_date:$end", "per_page" to "30", "sort" to "publication_date:desc", "search" to query.take(300),
     )))
     suspend fun arxiv(query: String, start: LocalDate, end: LocalDate): List<Paper> = arxivMutex.withLock {
@@ -50,7 +54,7 @@ class ScientificSources(private val client: OkHttpClient = OkHttpClient.Builder(
             val terms = tokens(query).take(12).joinToString(" OR ") { "all:$it" }
             val fmt = DateTimeFormatter.BASIC_ISO_DATE
             val search = (if (terms.isBlank()) "" else "($terms) AND ") + "submittedDate:[${start.format(fmt)}0000 TO ${end.format(fmt)}2359]"
-            parseArxiv(request("https://export.arxiv.org/api/query", mapOf("search_query" to search, "max_results" to "30", "sortBy" to "submittedDate", "sortOrder" to "descending")))
+            parseArxiv(request(arxivEndpoint, mapOf("search_query" to search, "max_results" to "30", "sortBy" to "submittedDate", "sortOrder" to "descending")))
         } finally { arxivNext = System.currentTimeMillis() + 3000 }
     }
     override suspend fun search(profile: Profile, known: List<Knowledge>, day: LocalDate): PaperSearchResult {

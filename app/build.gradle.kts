@@ -13,8 +13,8 @@ android {
         applicationId = "com.example.aiknowledgefeed"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1-local"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -61,8 +61,7 @@ dependencies {
     testImplementation("androidx.test:core:1.6.1")
     testImplementation("com.squareup.okhttp3:okhttp-tls:4.12.0")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
-    implementation("com.squareup.retrofit2:retrofit:2.11.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    implementation("com.google.code.gson:gson:2.10.1")
     implementation("androidx.datastore:datastore-preferences:1.1.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.1")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.1")
