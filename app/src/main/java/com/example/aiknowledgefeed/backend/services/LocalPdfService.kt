@@ -15,14 +15,20 @@ import kotlinx.coroutines.*
 import java.security.MessageDigest
 
 class LocalPdfService(context: Context, private val knowledge: LocalKnowledgeRepository, private val model: ModelClient) {
+    private val contextFiles = context.noBackupFilesDir
     init { PDFBoxResourceLoader.init(context.applicationContext) }
-    suspend fun importDocument(bytes: ByteArray, filename: String): Document = withContext(Dispatchers.IO) {
+    suspend fun importDocument(bytes: ByteArray, filename: String, expectedDocumentId: String? = null): Document = withContext(Dispatchers.IO) {
         if (bytes.isEmpty()) throw ConnectionFailure("pdf_empty")
         if (bytes.size > 10 * 1024 * 1024) throw ConnectionFailure("upload_too_large")
         if (bytes.take(5).toByteArray().toString(Charsets.US_ASCII) != "%PDF-") throw ConnectionFailure("pdf_malformed")
         val sha = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
-        knowledge.dao.documents().firstOrNull { it.sha256 == sha }?.let { return@withContext knowledge.documents().first { d -> d.id == it.id } }
-        val id = localId(); val chunks = mutableListOf<ChunkRow>()
+        val previous=knowledge.dao.documents().firstOrNull { it.sha256 == sha }
+        if(previous!=null && previous.status!="imported") {
+            val original=java.io.File(contextFiles,"pdfs/${previous.id}.pdf")
+            if(!original.exists()){original.parentFile?.mkdirs();original.writeBytes(bytes)}
+            return@withContext knowledge.documents().first { it.id==previous.id }
+        }
+        val id = previous?.id ?: localId(); val chunks = mutableListOf<ChunkRow>()
         try {
             withTimeout(15_000) {
                 PDDocument.load(bytes).use { document ->
@@ -48,19 +54,26 @@ class LocalPdfService(context: Context, private val knowledge: LocalKnowledgeRep
         catch (_: Exception) { throw ConnectionFailure("pdf_malformed") }
         if (chunks.isEmpty()) throw ConnectionFailure("pdf_no_text")
         knowledge.db.withTransaction {
+            // A cancelled/deleted staged import must never resurrect its document.
+            if(expectedDocumentId!=null && knowledge.dao.documents().none{it.id==expectedDocumentId && it.status=="imported"}) throw ConnectionFailure("not_found")
             // Concurrent duplicate imports are resolved inside the same SQLite transaction.
             val duplicate = knowledge.dao.documents().firstOrNull { it.sha256 == sha }
-            if (duplicate != null) return@withTransaction knowledge.documents().first { it.id == duplicate.id }
+            if (duplicate != null && duplicate.status!="imported") return@withTransaction knowledge.documents().first { it.id == duplicate.id }
             val clean = filename.substringAfterLast('/').substringAfterLast('\\').filter { !it.isISOControl() }.take(200).ifBlank { "Dokument.pdf" }
             knowledge.dao.document(DocumentRow(id, clean, "extracted", "Lokal extrahiert. Noch keine externe KI-Verarbeitung.", sha))
-            knowledge.dao.chunks(chunks); knowledge.changed()
+            knowledge.dao.chunks(chunks)
+            val directory=java.io.File(contextFiles,"pdfs").apply{mkdirs()}
+            val target=android.util.AtomicFile(java.io.File(directory,"$id.pdf"))
+            val stream=target.startWrite()
+            try{stream.write(bytes);target.finishWrite(stream)}catch(e:Exception){target.failWrite(stream);throw e}
+            knowledge.changed()
             knowledge.documents().first { it.id == id }
         }
     }
     suspend fun analyze(id: String, consent: Boolean, settings: Settings): Document {
         if (!consent) throw ConnectionFailure("consent_required")
         val document = knowledge.documents().firstOrNull { it.id == id } ?: throw ConnectionFailure("not_found")
-        if (document.status == "analyzed") return document
+        if (knowledge.dao.documents().firstOrNull { it.id == id }?.status == "analyzed") return document
         val chunks = knowledge.dao.chunks(id).take(12)
         if (chunks.isEmpty()) throw ConnectionFailure(if (document.status == "needs_text") "document_text_missing" else "pdf_no_text")
         val data = JsonArray().apply { chunks.forEach { add(JsonObject().apply { addProperty("page", it.page); addProperty("text", it.text) }) } }
@@ -86,6 +99,9 @@ class LocalPdfService(context: Context, private val knowledge: LocalKnowledgeRep
                 c.connections.map { mapping.getValue(normalized(it)) }.filter { it != concept }.forEach { knowledge.dao.link(LinkRow(concept, it)) }
             }
             val row = knowledge.dao.documents().firstOrNull { it.id == id } ?: throw ConnectionFailure("not_found")
+            knowledge.dao.analysisTasks().firstOrNull{it.documentId==id && it.state=="running"}?.let {
+                knowledge.dao.analysisTask(it.copy(state="awaiting_confirmation",version=AnalysisQueue.VERSION,model=settings.model,leaseUntil=0,error=null))
+            }
             knowledge.dao.document(row.copy(status = "analyzed", message = "Unbestätigte Konzepte. Maximal zwölf lokal gespeicherte Textabschnitte wurden extern analysiert."))
             knowledge.changed(); knowledge.documents().first { it.id == id }
         }

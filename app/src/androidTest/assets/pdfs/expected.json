@@ -1,0 +1,54 @@
+{
+  "synthetic": true,
+  "pages": 3,
+  "concepts": [
+    {
+      "name": "Machine Learning",
+      "pages": [
+        1
+      ]
+    },
+    {
+      "name": "Neuronale Netze",
+      "pages": [
+        1
+      ]
+    },
+    {
+      "name": "Deep Learning",
+      "pages": [
+        1
+      ]
+    },
+    {
+      "name": "Attention-Mechanismus",
+      "pages": [
+        2
+      ]
+    },
+    {
+      "name": "Transformer",
+      "pages": [
+        2
+      ]
+    },
+    {
+      "name": "Large Language Models",
+      "pages": [
+        3
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "from": "Transformer",
+      "to": "Attention-Mechanismus",
+      "type": "verwendet"
+    },
+    {
+      "from": "Large Language Models",
+      "to": "Transformer",
+      "type": "kann basieren auf"
+    }
+  ]
+}

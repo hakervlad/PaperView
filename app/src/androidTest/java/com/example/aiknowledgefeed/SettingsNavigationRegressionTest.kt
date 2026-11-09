@@ -52,7 +52,7 @@ class SettingsNavigationRegressionTest {
             compose.onNodeWithText("Mein Wissen").performClick()
             compose.onNodeWithText("MEIN WISSEN · DEINE SAMMLUNG").assertIsDisplayed()
             compose.onNodeWithText("Einstellungen").performClick()
-            compose.onNodeWithText("Backend-Verbindung").assertIsDisplayed()
+            compose.onNodeWithText("Daten auf diesem Gerät").assertIsDisplayed()
             compose.onNodeWithText("Mein Wissen").performClick()
             compose.onNodeWithText("MEIN WISSEN · DEINE SAMMLUNG").assertIsDisplayed()
             compose.onNodeWithText("Entdecken").performClick()

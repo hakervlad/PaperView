@@ -14,7 +14,7 @@ class NavigationRecreationTest {
         compose.onNodeWithText("Mein Wissen").performClick()
         compose.onNodeWithText("Einstellungen").performClick()
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("Backend-Verbindung").assertIsDisplayed()
+        compose.onNodeWithText("Daten auf diesem Gerät").assertIsDisplayed()
         compose.onNodeWithText("Mein Wissen").performClick()
         compose.onNodeWithText("MEIN WISSEN · DEINE SAMMLUNG").assertIsDisplayed()
         compose.activityRule.scenario.recreate()

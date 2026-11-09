@@ -1,22 +1,24 @@
 package com.example.aiknowledgefeed
 
 import com.example.aiknowledgefeed.backend.api.ScientificSources
+import com.example.aiknowledgefeed.backend.models.Paper
+import com.example.aiknowledgefeed.backend.services.ConnectionFailure
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.time.LocalDate
 
-/** Opt-in public metadata only; never a model call or personal knowledge upload. */
+/** Independent public metadata probes; never a model call or personal knowledge upload. */
 class LiveScientificSourcesTest {
-    @Test fun shippingKotlinClientsReachPublicPaperApisOverHttps() = runBlocking {
-        assumeTrue("Explicit live source probe disabled", System.getenv("PAPERVIEW_LIVE_SOURCES") == "1")
-        val source = ScientificSources(); val end = LocalDate.now(); val start = end.minusDays(30)
-        val openalex = source.openAlex("artificial intelligence", start, end)
-        println("Live OpenAlex: successful HTTPS response, parsed papers=${openalex.size}")
-        openalex.forEach { assertTrue(it.url.startsWith("https://")); LocalDate.parse(it.published_at) }
-        val arxiv = source.arxiv("transformer", start, end)
-        println("Live arXiv: successful HTTPS response, parsed papers=${arxiv.size}")
-        arxiv.forEach { assertTrue(it.url.startsWith("https://")); LocalDate.parse(it.published_at); assertEquals("preprint", it.review_status) }
+    private suspend fun probe(name:String, load:suspend (ScientificSources,LocalDate,LocalDate)->List<Paper>) {
+        assumeTrue("Explicit live source probe disabled",System.getenv("PAPERVIEW_LIVE_SOURCES")=="1")
+        val end=LocalDate.now()
+        val papers=try{load(ScientificSources(),end.minusDays(30),end)}catch(e:ConnectionFailure){throw AssertionError("$name: ${e.code}")}
+        println("Live $name: successful HTTPS response, parsed papers=${papers.size}")
+        papers.forEach{assertTrue(it.url.startsWith("https://"));LocalDate.parse(it.published_at)}
+        if(name=="arXiv")papers.forEach{assertEquals("preprint",it.review_status)}
     }
+    @Test fun shippingKotlinClientReachesOpenAlexOverHttps()=runBlocking {probe("OpenAlex"){s,a,b->s.openAlex("artificial intelligence",a,b)}}
+    @Test fun shippingKotlinClientReachesArxivOverHttps()=runBlocking {probe("arXiv"){s,a,b->s.arxiv("transformer",a,b)}}
 }

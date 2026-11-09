@@ -30,8 +30,12 @@ class LocalKnowledgeRepository(val db: LocalDatabase) {
             evidence.filter { it.conceptId == row.id }.map { it.documentId }) }
     }
     suspend fun documents(): List<Document> {
-        val knowledge = knowledge()
-        return dao.documents().map { Document(it.id, it.filename, it.status, it.message, knowledge.filter { k -> it.id in k.document_ids }) }
+        val knowledge = knowledge(); val tasks=dao.analysisTasks()
+        return dao.documents().map { row ->
+            val concepts=knowledge.filter { row.id in it.document_ids };val task=tasks.firstOrNull{it.documentId==row.id}
+            val state=if(task==null || (row.status=="analyzed" && task.version==0))row.status else if(task.state=="awaiting_confirmation" && concepts.none{it.status=="candidate"})"processed" else task.state
+            Document(row.id,row.filename,state,task?.error ?: row.message,concepts)
+        }
     }
     suspend fun latestFeed(): Feed = dao.latestSuccessfulFeed()?.json?.let { gson.fromJson(it, Feed::class.java) } ?: Feed()
     suspend fun snapshot() = db.withTransaction { Snapshot(latestFeed(), knowledge(), profile(), documents()) }

@@ -27,6 +27,7 @@ class DirectModelClient(private val client: OkHttpClient = OkHttpClient.Builder(
         val base = settings.llmBaseUrl.ifBlank { "https://api.openai.com/v1" }.trimEnd('/').toHttpUrlOrNull() ?: throw ConnectionFailure("configuration_error")
         if (!base.isHttps) throw ConnectionFailure("https_required")
         require(base.username.isEmpty() && base.password.isEmpty() && base.query == null && base.fragment == null)
+        if (settings.credentialEpoch < SettingsPersistence.KEY_EPOCH) throw ConnectionFailure("key_rotation_required")
         if (!settings.directApiConsent) throw ConnectionFailure("direct_consent_required")
         if (settings.apiKey.isBlank()) throw ConnectionFailure("llm_missing_key")
         if (settings.model.isBlank()) throw ConnectionFailure("llm_missing_model")

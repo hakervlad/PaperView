@@ -1,5 +1,6 @@
 package com.example.aiknowledgefeed.backend.repositories
 
+import androidx.room.withTransaction
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -23,6 +24,11 @@ class PaperViewRepository(
     val knowledge = LocalKnowledgeRepository(db)
     private val pdf = LocalPdfService(context, knowledge, model)
     private val feeds = LocalFeedService(knowledge, source, LocalPersonalizer(knowledge, model), now)
+    private val analysis = AnalysisQueue(knowledge,pdf)
+    suspend fun resumeAnalyses(settings:Settings) {
+        knowledge.dao.documents().filter{it.status=="imported"}.forEach{PdfExtractionWorker.enqueue(context,it.id)}
+        analysis.reconcile(settings).forEach { PdfAnalysisWorker.enqueue(context,it) }
+    }
     suspend fun initialize(): String? {
         if (knowledge.dao.metadata("legacy-cache-v1") != null) return null
         val snapshot = try { store.snapshot() } catch (_: Exception) {
@@ -34,7 +40,17 @@ class PaperViewRepository(
     fun observe() = knowledge.observe()
     suspend fun snapshot() = knowledge.snapshot()
     suspend fun generate(settings: Settings, timezone: String) = feeds.generate(settings, timezone)
-    suspend fun analyze(id: String, settings: Settings) = pdf.analyze(id, true, settings)
+    suspend fun analyze(id: String, settings: Settings, force:Boolean=false) {
+        analysis.consent(id,force);resumeAnalyses(settings)
+    }
+    suspend fun removeDocument(id:String) {
+        withContext(Dispatchers.IO) {
+            val work=androidx.work.WorkManager.getInstance(context)
+            work.cancelUniqueWork("pdf-extraction:$id").result.get()
+            work.cancelUniqueWork("pdf-analysis:$id").result.get()
+        }
+        knowledge.removeDocument(id);java.io.File(context.noBackupFilesDir,"pdfs/$id.pdf").delete()
+    }
     private suspend fun read(uri: Uri, limit: Int): ByteArray = withContext(Dispatchers.IO) {
         try { context.contentResolver.openInputStream(uri)?.use { input ->
             val output = ByteArrayOutputStream(); val buffer = ByteArray(8192)
@@ -53,7 +69,21 @@ class PaperViewRepository(
     }
     suspend fun upload(uri: Uri): Document {
         val filename = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null } ?: "Dokument.pdf"
-        return pdf.importDocument(read(uri, 10 * 1024 * 1024), filename)
+        val bytes=read(uri,10*1024*1024)
+        if(bytes.isEmpty())throw ConnectionFailure("pdf_empty")
+        if(bytes.take(5).toByteArray().toString(Charsets.US_ASCII)!="%PDF-")throw ConnectionFailure("pdf_malformed")
+        val hash=java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString(""){"%02x".format(it)}
+        val id=knowledge.db.withTransaction {
+            val existing=knowledge.dao.documents().firstOrNull{it.sha256==hash}
+            if(existing!=null)return@withTransaction existing.id
+            val id=localId();val file=java.io.File(context.noBackupFilesDir,"pdfs/$id.pdf");file.parentFile?.mkdirs()
+            val atomic=android.util.AtomicFile(file);val stream=atomic.startWrite()
+            try{stream.write(bytes);atomic.finishWrite(stream)}catch(e:Exception){atomic.failWrite(stream);throw e}
+            knowledge.dao.document(com.example.aiknowledgefeed.backend.database.DocumentRow(id,filename.substringAfterLast('/').substringAfterLast('\\').take(200),"imported",null,hash))
+            knowledge.dao.analysisTask(com.example.aiknowledgefeed.backend.database.AnalysisTaskRow(id,System.currentTimeMillis(),state="imported"));knowledge.changed();id
+        }
+        PdfExtractionWorker.enqueue(context,id)
+        return knowledge.documents().first{it.id==id}
     }
     suspend fun importArchive(uri: Uri) = LegacyArchiveImporter(knowledge).importBytes(read(uri, 20 * 1024 * 1024))
     suspend fun test(settings: Settings, progress: (List<ConnectionStep>) -> Unit): List<ConnectionStep> {

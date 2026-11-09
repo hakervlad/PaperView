@@ -1,0 +1,2 @@
+# Preserve PDF byte offsets and review them as binary assets.
+*.pdf binary
