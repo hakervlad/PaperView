@@ -6,7 +6,7 @@ Die Anwendung läuft innerhalb der Android-App: Compose → ViewModel/StateFlow 
 
 Room liegt im privaten, vom Android-Backup ausgeschlossenen App-Verzeichnis. Tabellen enthalten Profil, Dokumentstatus, Textabschnitte mit Seitenreferenz, Konzepte, Belege, Konzeptverbindungen, Papers, Tagesausgaben, bereits angezeigte Kennungen und Migrations-/Retry-Metadaten. Secrets liegen ausschließlich in der bestehenden Keystore-/AES-GCM-geschützten Einstellungsspeicherung. Keine destruktive Room-Migration.
 
-Der verschlüsselte Alt-Cache wird beim ersten Start einmalig und transaktional übernommen. Er wird nicht gelöscht. Bestehende API-Keys bleiben erhalten. Ein Cache enthält nur den zuletzt geladenen Stand, nicht zwangsläufig sämtliche Serverdaten oder PDF-Textabschnitte.
+Der verschlüsselte Alt-Cache wird beim ersten Start einmalig und transaktional übernommen. Er wird nicht gelöscht. Bestehende API-Keys bleiben verschlüsselt erhalten, sind wegen des gemeldeten Schlüsselvorfalls jedoch für neue Modellaufrufe gesperrt. Einen neuen Schlüssel außerhalb des Chats eingeben; der alte darf nicht erneut verwendet werden. Ein Cache enthält nur den zuletzt geladenen Stand, nicht zwangsläufig sämtliche Serverdaten oder PDF-Textabschnitte.
 
 Falls alte Serverdaten existieren:
 
@@ -38,13 +38,13 @@ Tagesausgaben werden anhand des lokalen Kalendertags gespeichert und wiederverwe
 
 ## Einrichtung der privaten Testversion
 
-1. Die normale Debug-APK als Update installieren, nicht vorher deinstallieren. Die Paket-ID bleibt `com.example.aiknowledgefeed`; Version `1.1-local`, Versionscode 2.
+1. Die normale Debug-APK als Update installieren, nicht vorher deinstallieren. Die Paket-ID bleibt `com.example.aiknowledgefeed`; Version `1.2-analysis`, Versionscode 3.
 2. Unter **Einstellungen → Persönliches Wissen** Studienfach, Schwerpunkte/Interessen und ausdrücklich bekanntes Vorwissen speichern. Das funktioniert ohne API-Key und ohne Internet.
 3. **PDF auswählen → Lokal importieren und Text extrahieren**. Es gibt keinen Upload an einen eigenen Server. Ein Dokument aus dem Alt-Cache mit fehlenden Textabschnitten ist entsprechend markiert; vollständiges Serverarchiv importieren oder PDF erneut lokal auswählen.
 4. Unter **KI-Modell konfigurieren** einen eigenen OpenAI-Key und einen exakten, für das eigene Konto verfügbaren Chat-Completions-/JSON-kompatiblen Modellnamen eintragen. Die Basis-URL kann für OpenAI leer bleiben (`https://api.openai.com/v1`). Keine Backend-URL und kein Backend-Zugriffsschlüssel sind nötig.
 5. Die Risiken der direkten privaten Anbindung lesen und die Checkbox ausdrücklich aktivieren. **KI-Einstellungen speichern** speichert lokal; es bestätigt noch keine Modellverbindung. Leeres Schlüsselfeld bewahrt einen vorhandenen Key, Löschen erfolgt nur über den Löschbutton.
 6. **Gespeicherte Verbindung testen** prüft lokale Datenbank, Anbieter und ein echtes Modellresultat. Ungültiger Schlüssel, Guthabenmangel, Rate Limit, Modell-/Parameterfehler, TLS- und Netzwerkfehler werden getrennt angezeigt. Ein fehlgeschlagener Test löscht den Schlüssel nicht.
-7. Bei einem lokalen Dokument **Konzepte mit KI ermitteln** und erst nach Prüfung der Übertragung zustimmen. Kandidaten korrigieren und **Als verstanden bestätigen**. Anschließend **Feed aktualisieren** oder die App am nächsten Tag erneut öffnen.
+7. Bei einem lokalen Dokument **Analyse erlauben / erneut versuchen** und erst nach Prüfung der Übertragung zustimmen. Nach Schlüsselkonfiguration und Zustimmung setzt WorkManager die vorgemerkte Analyse automatisch bei Internetverbindung fort. Kandidaten korrigieren und **Als verstanden bestätigen**. Anschließend **Feed aktualisieren** oder die App am nächsten Tag erneut öffnen.
 8. In der Detailansicht ein Thema als verstanden markieren. **Mein Wissen** zeigt dauerhaft gespeicherte Konzepte und Paperbezüge. Neue bestätigte Einträge werden bei späteren Ausgaben berücksichtigt.
 
 Für einen anderen kompatiblen Anbieter ist dessen dokumentierte HTTPS-Basis-URL erforderlich. Der frei eingegebene Anbietername ist nur eine Bezeichnung und ändert den Endpunkt nicht automatisch. Es gibt keine serverseitigen Modell-/Schlüsselvorgaben mehr.
@@ -69,15 +69,17 @@ PYTHONPATH=backend python -m pytest backend/tests -q
 
 Auf diesem speicherbegrenzten Entwicklungsrechner wurden Gradle-Aufrufe nacheinander mit `--max-workers=1 -Dorg.gradle.jvmargs='-Xmx900m -Dfile.encoding=UTF-8' -Pkotlin.compiler.execution.strategy=in-process` ausgeführt. Erste Builds waren durch abgestürzte Gradle-Daemons unter Ressourcenlast unterbrochen; diese Unterbrechungen wurden nicht als erfolgreiche Prüfungen gewertet.
 
-Der Gerätetest-Parameter baut eine isolierte App-ID mit `.regression`. Danach eine normale APK ohne diesen Parameter erstellen. Für die Auslieferung liegt zusätzlich eine feste Kopie unter `app/build/outputs/apk/debug/PaperView-1.1-local-debug.apk`.
+Der Gerätetest-Parameter baut eine isolierte App-ID mit `.regression`. Danach eine normale APK ohne diesen Parameter erstellen. Für die Auslieferung liegt zusätzlich eine feste Kopie unter `app/build/outputs/apk/debug/PaperView-1.2-analysis-debug.apk`.
 
 ```sh
-adb install -r app/build/outputs/apk/debug/PaperView-1.1-local-debug.apk
+adb install -r app/build/outputs/apk/debug/PaperView-1.2-analysis-debug.apk
 ```
 
 Auch die manuelle Installation der APK auf dem Smartphone ist möglich. Bei einem Signaturkonflikt den bisherigen Signaturschlüssel klären; nicht zur Problemlösung deinstallieren oder App-Daten löschen. APKs und Testberichte liegen unter dem von Git ausgeschlossenen Build-Verzeichnis.
 
-## Prüfergebnisse und Grenzen
+## Frühere Prüfergebnisse und Grenzen
+
+**Aktueller Systemtest vom 9. November 2026:** [PDF-Analyse und Live-Modelltests](SYSTEMTEST_PDF_ANALYSIS.md). Die folgenden Ergebnisse dokumentieren den Stand vor dieser Erweiterung.
 
 Abschließender Stand (8. November 2026):
 

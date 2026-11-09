@@ -41,6 +41,7 @@ class PaperViewModel @JvmOverloads constructor(
                 val snapshot = repository.snapshot()
                 mutable.update { it.copy(data = snapshot, message = warning) }
                 observe()
+                repository.resumeAnalyses(settings)
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { fail(e) }
             finally { mutable.update { it.copy(busy = false) } }
@@ -57,7 +58,7 @@ class PaperViewModel @JvmOverloads constructor(
     }
     private fun canGenerate(): Boolean {
         val s = mutable.value.settings; val p = mutable.value.data.profile
-        return s.directApiConsent && s.apiKey.isNotBlank() && s.model.isNotBlank() &&
+        return s.credentialEpoch >= SettingsPersistence.KEY_EPOCH && s.directApiConsent && s.apiKey.isNotBlank() && s.model.isNotBlank() &&
             (p.bachelor_subject.isNotBlank() || p.interests.isNotEmpty() || p.focus_areas.isNotEmpty() || mutable.value.data.knowledge.any { it.status == "confirmed" })
     }
     private fun fail(error: Exception) {
@@ -107,7 +108,7 @@ class PaperViewModel @JvmOverloads constructor(
                 mutable.update { it.copy(settings = saved, connectionSteps = emptyList(), message = if (saved.apiKey.isNotBlank())
                     "API-Key gespeichert. KI-Einstellungen lokal gespeichert."
                     else "KI-Einstellungen lokal gespeichert.") }
-                try { repository.initialize(); observe() }
+                try { repository.initialize(); observe(); repository.resumeAnalyses(saved) }
                 catch (e: CancellationException) { throw e }
                 catch (_: Exception) { mutable.update { it.copy(message = "KI-Einstellungen sicher gespeichert. Die lokale Datenbank konnte noch nicht geladen werden.") } }
             } catch (e: CancellationException) { throw e }
@@ -146,14 +147,15 @@ class PaperViewModel @JvmOverloads constructor(
     }
     fun upload(uri: Uri) = action {
         val saved = repository.upload(uri)
-        mutable.update { it.copy(data = it.data.copy(documents = it.data.documents.filterNot { d -> d.id == saved.id } + saved), message = "PDF lokal importiert und Text extrahiert. Noch keine externe KI-Verarbeitung.") }
+        repository.resumeAnalyses(mutable.value.settings)
+        mutable.update { it.copy(data = it.data.copy(documents = it.data.documents.filterNot { d -> d.id == saved.id } + saved), message = "PDF lokal gespeichert. Textextraktion und Wissensanalyse sind dauerhaft vorgemerkt.") }
     }
-    fun analyze(id: String) = action {
-        val saved = repository.analyze(id, mutable.value.settings)
-        mutable.update { it.copy(data = it.data.copy(documents = it.data.documents.filterNot { d -> d.id == id } + saved, knowledge = saved.concepts.fold(it.data.knowledge) { values, k -> values.upsert(k) }), message = "Konzepte ermittelt. Bitte das mögliche Vorwissen prüfen und bestätigen.") }
+    fun analyze(id: String, force:Boolean=false) = action {
+        repository.analyze(id,mutable.value.settings,force)
+        mutable.update { it.copy(message="Analyse vorgemerkt. Sie startet nach Zustimmung und neuer Schlüsselkonfiguration bei Internetverbindung automatisch.") }
     }
     fun removeDocument(id: String) = action {
-        repository.knowledge.removeDocument(id)
+        repository.removeDocument(id)
         mutable.update { it.copy(data = it.data.copy(documents = it.data.documents.filterNot { d -> d.id == id }), message = "Dokument und Textabschnitte lokal gelöscht.") }
     }
     fun importArchive(uri: Uri) = action {

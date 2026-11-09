@@ -26,8 +26,13 @@ data class SeenRow(@PrimaryKey val identifier: String)
 @Entity(tableName = "metadata")
 data class MetadataRow(@PrimaryKey val key: String, val value: String)
 
+@Entity(tableName = "analysis_tasks", foreignKeys = [ForeignKey(entity = DocumentRow::class, parentColumns = ["id"], childColumns = ["documentId"], onDelete = ForeignKey.CASCADE)])
+data class AnalysisTaskRow(@PrimaryKey val documentId: String, val importedAt: Long, val state: String = "waiting_key", val consent: Boolean = false, val model: String = "", val version: Int = 0, val leaseUntil: Long = 0, val error: String? = null)
+
 @Dao
 interface LocalDao {
+    @Query("SELECT * FROM analysis_tasks") suspend fun analysisTasks(): List<AnalysisTaskRow>
+    @Upsert suspend fun analysisTask(row: AnalysisTaskRow)
     @Query("SELECT * FROM profile WHERE id = 1") suspend fun profile(): ProfileRow?
     @Upsert suspend fun profile(row: ProfileRow)
     @Query("SELECT * FROM knowledge ORDER BY rowid") suspend fun knowledge(): List<KnowledgeRow>
@@ -60,15 +65,21 @@ interface LocalDao {
     @Query("SELECT value FROM metadata WHERE `key` = 'revision'") fun observeRevision(): Flow<String?>
 }
 
-@Database(entities = [ProfileRow::class, DocumentRow::class, ChunkRow::class, KnowledgeRow::class, LinkRow::class, EvidenceRow::class, PaperRow::class, FeedRow::class, SeenRow::class, MetadataRow::class], version = 1, exportSchema = true)
+@Database(entities = [ProfileRow::class, DocumentRow::class, ChunkRow::class, KnowledgeRow::class, LinkRow::class, EvidenceRow::class, PaperRow::class, FeedRow::class, SeenRow::class, MetadataRow::class, AnalysisTaskRow::class], version = 2, exportSchema = true)
 abstract class LocalDatabase : RoomDatabase() {
     abstract fun dao(): LocalDao
     companion object {
+        val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS analysis_tasks (documentId TEXT NOT NULL PRIMARY KEY, importedAt INTEGER NOT NULL, state TEXT NOT NULL, consent INTEGER NOT NULL, model TEXT NOT NULL, version INTEGER NOT NULL, leaseUntil INTEGER NOT NULL, error TEXT, FOREIGN KEY(documentId) REFERENCES documents(id) ON DELETE CASCADE)")
+                db.execSQL("INSERT INTO analysis_tasks SELECT id, 0, CASE WHEN status = 'analyzed' THEN 'awaiting_confirmation' ELSE 'waiting_key' END, 0, '', CASE WHEN status = 'analyzed' THEN 1 ELSE 0 END, 0, NULL FROM documents WHERE status != 'needs_text'")
+            }
+        }
         @Volatile private var instance: LocalDatabase? = null
         fun open(context: Context): LocalDatabase = instance ?: synchronized(this) {
             instance ?: create(context, File(context.noBackupFilesDir, "paperview.db").absolutePath).also { instance = it }
         }
-        fun create(context: Context, path: String): LocalDatabase = Room.databaseBuilder(context.applicationContext, LocalDatabase::class.java, path).build()
+        fun create(context: Context, path: String): LocalDatabase = Room.databaseBuilder(context.applicationContext, LocalDatabase::class.java, path).addMigrations(MIGRATION_1_2).build()
         fun inMemory(context: Context): LocalDatabase = Room.inMemoryDatabaseBuilder(context.applicationContext, LocalDatabase::class.java).build()
     }
 }

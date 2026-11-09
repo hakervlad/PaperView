@@ -36,4 +36,14 @@ class SettingsPersistenceTest {
         try { SettingsPersistence(store).save(Settings(apiKey="new-fixture"));fail("Write must fail") }
         catch (_:java.io.IOException) { assertEquals("old-fixture",store.value.apiKey) }
     }
+    @Test fun rotationUsesPersistedKeyInsteadOfPossiblyUnloadedUiState()=runBlocking {
+        val store=Store(Settings(apiKey="old-fixture",credentialEpoch=0))
+        val saved=SettingsPersistence(store).save(Settings(apiKey="old-fixture",credentialEpoch=20261109))
+        assertEquals(0,saved.credentialEpoch)
+        val fresh=SettingsPersistence(store).save(Settings(apiKey="fresh-fixture"))
+        assertEquals(20261109,fresh.credentialEpoch)
+        assertEquals(20261109,SettingsPersistence(store).save(Settings(model="changed")).credentialEpoch)
+        assertEquals(0,SettingsPersistence(store).save(Settings(),clearApiKey=true).credentialEpoch)
+    }
+
 }

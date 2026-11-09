@@ -48,6 +48,7 @@ fun SettingsScreen(vm: PaperViewModel, state: AppState, modifier: Modifier = Mod
     fun parts(text: String) = text.split(',').map { it.trim() }.filter { it.isNotEmpty() }
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Einstellungen", style = MaterialTheme.typography.headlineLarge)
+        Text("Sicherheit: Den offengelegten API-Key widerrufen und ausschließlich einen neu erzeugten Schlüssel eingeben. Bisherige Schlüssel sind für Modellaufrufe gesperrt.")
         Text("Daten auf diesem Gerät", style = MaterialTheme.typography.titleLarge)
         Text("Wissen, Profil, Dokumenttexte und Feed-Historie werden lokal gespeichert. Du benötigst keinen eigenen Backend-Server. Nur Paper-Suche und KI-Analyse benötigen Internet.")
         Text("KI-Modell konfigurieren", style = MaterialTheme.typography.titleLarge)
@@ -92,9 +93,9 @@ fun SettingsScreen(vm: PaperViewModel, state: AppState, modifier: Modifier = Mod
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(document.filename, style = MaterialTheme.typography.titleMedium)
-                    Text("Status: " + when (document.status) { "uploaded", "extracted" -> "Text extrahiert"; "analyzed", "completed" -> "Konzepte ermittelt"; "processing" -> "Verarbeitung läuft"; "failed", "error" -> "Verarbeitung fehlgeschlagen"; "needs_text" -> "Textabschnitte fehlen auf diesem Gerät"; else -> document.status })
+                    Text("Status: " + when (document.status) { "imported" -> "Importiert – Textextraktion vorgemerkt"; "uploaded", "extracted" -> "Text extrahiert"; "waiting_key" -> "Wartet auf neuen API-Key / Modell"; "waiting_consent" -> "Wartet auf Zustimmung"; "queued" -> "Wartet auf Analyse / Internet"; "running" -> "Wird analysiert"; "awaiting_confirmation" -> "Wartet auf Bestätigung"; "processed" -> "Erfolgreich verarbeitet"; "analyzed", "completed" -> "Konzepte ermittelt"; "processing" -> "Verarbeitung läuft"; "failed", "error" -> "Verarbeitung fehlgeschlagen"; "needs_text" -> "Textabschnitte fehlen auf diesem Gerät"; else -> document.status })
                     document.message?.let { Text(it) }
-                    Button(onClick = { consentDocument = document.id }, enabled = !state.busy && document.status != "needs_text") { Text("Konzepte mit KI ermitteln") }
+                    Button(onClick = { consentDocument = document.id }, enabled = !state.busy && document.status != "needs_text") { Text(if(document.status in listOf("awaiting_confirmation","processed","analyzed")) "Erneute Analyse anfordern" else "Analyse erlauben / erneut versuchen") }
                     TextButton(onClick = { vm.removeDocument(document.id) }, enabled = !state.busy) { Text("Dokument und zugehörige Belege löschen") }
                 }
             }
@@ -122,7 +123,7 @@ fun SettingsScreen(vm: PaperViewModel, state: AppState, modifier: Modifier = Mod
     consentDocument?.let { id ->
         AlertDialog(onDismissRequest = { consentDocument = null }, title = { Text("Externe KI-Verarbeitung erlauben?") },
             text = { Text("Maximal zwölf benötigte Textabschnitte dieses lokal gespeicherten Dokuments werden direkt über HTTPS an den konfigurierten KI-Anbieter gesendet. Dies kann vertrauliche Inhalte übertragen und Kosten verursachen. Bestätige nur, wenn du dafür berechtigt bist.") },
-            confirmButton = { TextButton(onClick = { consentDocument = null; vm.analyze(id) }) { Text("Zustimmen und analysieren") } },
+            confirmButton = { TextButton(onClick = { consentDocument = null; vm.analyze(id, force = state.data.documents.firstOrNull { it.id == id }?.status in listOf("awaiting_confirmation", "processed", "analyzed")) }) { Text("Zustimmen und analysieren") } },
             dismissButton = { TextButton(onClick = { consentDocument = null }) { Text("Abbrechen") } })
     }
 }

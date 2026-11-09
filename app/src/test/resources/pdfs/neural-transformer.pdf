@@ -1,0 +1,54 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [4 0 R 6 0 R 8 0 R] /Count 3 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>
+endobj
+5 0 obj
+<< /Length 1248 >>
+stream
+BT /F1 15 Tf 45 790 Td (Grundlagen neuronaler Netze und Transformer-Architekturen) Tj /F1 11 Tf 0 -35 Td (Machine Learning lernt Muster aus Beispieldaten. Training passt Parameter an eine) Tj 0 -17 Td (Zielfunktion an. Ein separater Testsatz dient dazu, die Generalisierung zu) Tj 0 -17 Td (untersuchen. Dieses synthetische Dokument nennt keine experimentellen Ergebnisse.) Tj 0 -17 Td 0 -10 Td (Neuronale Netze verbinden gewichtete Eingaben mit nichtlinearen Aktivierungen. Eine) Tj 0 -17 Td (Schicht berechnet Merkmale, die an weitere Schichten weitergegeben werden. Gradienten) Tj 0 -17 Td (geben eine Richtung zur Anpassung der Gewichte an.) Tj 0 -17 Td 0 -10 Td (Deep Learning verwendet mehrere Schichten neuronaler Netze. Dadurch lassen sich) Tj 0 -17 Td (hierarchische Darstellungen lernen. Deep Learning ist ein Teilgebiet von Machine) Tj 0 -17 Td (Learning. Eine tiefere Architektur garantiert weder bessere Generalisierung noch) Tj 0 -17 Td (fehlerfreie Antworten.) Tj 0 -17 Td 0 -10 Td (Erwartete Beziehungen: Deep Learning verwendet Neuronale Netze. Deep Learning gehoert) Tj 0 -17 Td (zu Machine Learning. Die Erwaehnung dieser Begriffe beweist kein Wissen des Lesers.) Tj 0 -17 Td 0 -10 Td (Synthetisches Testdokument - Seite 1) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 7 0 R >>
+endobj
+7 0 obj
+<< /Length 1261 >>
+stream
+BT /F1 15 Tf 45 790 Td (Attention und Transformer) Tj /F1 11 Tf 0 -35 Td (Der Attention-Mechanismus gewichtet Informationen anhand ihrer Beziehung zu einer) Tj 0 -17 Td (Anfrage. Queries werden mit Keys verglichen; diese Vergleiche bestimmen Gewichte fuer) Tj 0 -17 Td (Values. Self-Attention verknuepft Elemente innerhalb derselben Sequenz.) Tj 0 -17 Td 0 -10 Td (Ein Transformer verwendet Attention-Mechanismen und weitere neuronale) Tj 0 -17 Td (Verarbeitungsschichten. Positionsinformationen helfen dabei, die Reihenfolge der) Tj 0 -17 Td (Eingaben zu beruecksichtigen. Attention allein ersetzt keine sorgfaeltige Evaluation.) Tj 0 -17 Td 0 -10 Td (Die Strukturbeziehung lautet: Transformer verwendet Attention-Mechanismus. Das ist) Tj 0 -17 Td (eine Architekturbeziehung und keine Aussage ueber menschliches Verstehen. Dieses) Tj 0 -17 Td (Dokument behauptet keine Messwerte oder realen Forschungsergebnisse.) Tj 0 -17 Td 0 -10 Td (Unterschiedliche Attention-Verfahren koennen unterschiedliche Rechenanforderungen) Tj 0 -17 Td (besitzen. Aus dieser allgemeinen Aussage folgt keine bestimmte Beschleunigung. Solche) Tj 0 -17 Td (Zahlen duerfen bei der Zusammenfassung nicht erfunden werden.) Tj 0 -17 Td 0 -10 Td (Synthetisches Testdokument - Seite 2) Tj ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 9 0 R >>
+endobj
+9 0 obj
+<< /Length 1270 >>
+stream
+BT /F1 15 Tf 45 790 Td (Sprachmodelle und Grenzen) Tj /F1 11 Tf 0 -35 Td (Large Language Models sind grosse Sprachmodelle, die Muster aus Texten lernen. Sie) Tj 0 -17 Td (koennen auf Transformer-Architekturen basieren. Sie schaetzen beispielsweise) Tj 0 -17 Td (Wahrscheinlichkeiten fuer nachfolgende Token.) Tj 0 -17 Td 0 -10 Td (Die Beziehung lautet: Large Language Models koennen auf Transformer basieren. Nicht) Tj 0 -17 Td (jedes Sprachmodell muss ein Transformer sein. Die Begriffe Sprachmodelle und Large) Tj 0 -17 Td (Language Models beziehen sich hier auf Textmodellierung.) Tj 0 -17 Td 0 -10 Td (Machine Learning umfasst Deep Learning. Deep Learning nutzt Neuronale Netze.) Tj 0 -17 Td (Transformer verwenden Attention. Datenqualitaet, Training und Evaluation beeinflussen) Tj 0 -17 Td (die Zuverlaessigkeit. Sprachmodelle koennen unzutreffende Aussagen erzeugen.) Tj 0 -17 Td 0 -10 Td (Dieses vollstaendig synthetische Lehrdokument dient ausschliesslich dem Softwaretest.) Tj 0 -17 Td (Es enthaelt keine echten Literaturangaben, vertraulichen Informationen oder) Tj 0 -17 Td (behaupteten empirischen Ergebnisse. Extrahierte Begriffe muessen durch den Benutzer) Tj 0 -17 Td (bestaetigt werden.) Tj 0 -17 Td 0 -10 Td (Synthetisches Testdokument - Seite 3) Tj ET
+endstream
+endobj
+xref
+0 10
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000127 00000 n 
+0000000197 00000 n 
+0000000323 00000 n 
+0000001623 00000 n 
+0000001749 00000 n 
+0000003062 00000 n 
+0000003188 00000 n 
+trailer
+<< /Size 10 /Root 1 0 R >>
+startxref
+4510
+%%EOF

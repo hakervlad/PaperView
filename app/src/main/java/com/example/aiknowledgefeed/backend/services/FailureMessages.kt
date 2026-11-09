@@ -23,6 +23,7 @@ object FailureMessages {
         else -> "unexpected_error"
     }
     fun message(code: String): String = when (code) {
+        "key_rotation_required" -> "Der zuvor offengelegte Schlüssel darf nicht verwendet werden. Bitte widerrufen und einen neu erzeugten API-Key sicher eingeben."
         "source_unavailable" -> "Wissenschaftliche Quelle nicht erreichbar. Internetverbindung und Quellenstatus prüfen."
         "source_rate_limit" -> "Anfragelimit einer wissenschaftlichen Quelle erreicht. Bitte später erneut versuchen."
         "source_invalid" -> "Ungültige Antwort einer wissenschaftlichen Quelle. Der gespeicherte Feed bleibt erhalten."

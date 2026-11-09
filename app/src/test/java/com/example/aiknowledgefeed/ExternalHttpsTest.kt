@@ -23,7 +23,7 @@ class ExternalHttpsTest {
     @Test fun shippingClientsRejectUntrustedCertificatesAndWrongHostnames() = runBlocking {
         val (untrusted, _) = fixture()
         untrusted.use { server ->
-            val settings = Settings(apiKey = "fixture", model = "fixture", llmBaseUrl = server.url("/v1").toString(), directApiConsent = true)
+            val settings = Settings(credentialEpoch = 20261109, apiKey = "fixture", model = "fixture", llmBaseUrl = server.url("/v1").toString(), directApiConsent = true)
             try { DirectModelClient().complete(settings, "JSON", JsonObject()); fail("Untrusted certificate accepted") }
             catch (e: ConnectionFailure) { assertEquals("llm_tls", e.code) }
             try { ScientificSources(openAlexEndpoint = server.url("/works").toString()).openAlex("Bayes", LocalDate.parse("2026-11-01"), LocalDate.parse("2026-11-08")); fail("Untrusted source certificate accepted") }
@@ -32,7 +32,7 @@ class ExternalHttpsTest {
         }
         val (wrongHost, client) = fixture("different.invalid")
         wrongHost.use { server ->
-            val settings = Settings(apiKey = "fixture", model = "fixture", llmBaseUrl = server.url("/v1").toString(), directApiConsent = true)
+            val settings = Settings(credentialEpoch = 20261109, apiKey = "fixture", model = "fixture", llmBaseUrl = server.url("/v1").toString(), directApiConsent = true)
             try { DirectModelClient(client).complete(settings, "JSON", JsonObject()); fail("Wrong certificate hostname accepted") }
             catch (e: ConnectionFailure) { assertEquals("llm_tls", e.code) }
             assertEquals(0, server.requestCount)
@@ -56,7 +56,7 @@ class ExternalHttpsTest {
     @Test fun directModelRequiresExplicitConsentAndRejectsMalformedResponsesAndTimeouts() = runBlocking {
         val (server, client) = fixture()
         server.use {
-            val settings = Settings(apiKey = "fixture", model = "fixture", llmBaseUrl = server.url("/v1").toString())
+            val settings = Settings(credentialEpoch = 20261109, apiKey = "fixture", model = "fixture", llmBaseUrl = server.url("/v1").toString())
             try { DirectModelClient(client).complete(settings, "JSON", JsonObject()); fail("Consent") }
             catch (e: ConnectionFailure) { assertEquals("direct_consent_required", e.code) }
             assertEquals(0, server.requestCount)

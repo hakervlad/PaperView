@@ -17,7 +17,7 @@ class LocalPersonalizer(private val knowledge: LocalKnowledgeRepository, private
                 addProperty("id", k.id); addProperty("name", k.name); addProperty("description", k.description.take(600))
             }) } })
         }
-        val answer = model.complete(settings, "Schema: {\"title\":str,\"summary\":str,\"concept_ids\":[str],\"new_insight\":str,\"connection\":str,\"relevance\":str,\"takeaway\":str}. Deutscher Titel, Kurzfassung ungefähr 60–120 Wörter. Nur Aussagen aus dem Abstract. Unsicherheiten und Analogien kennzeichnen, unbekannte Begriffe erklären. concept_ids ausschließlich aus confirmed_knowledge. Nur zu diesen IDs Vorwissen behaupten. Ohne passenden Bezug concept_ids=[] und connection=\"\"; fehlenden Bezug offen benennen und Grundlagen erklären. Keine erfundenen Experimente, Zahlen oder Fähigkeiten.", context)
+        val answer = model.complete(settings, "Schema: {\"title\":str,\"summary\":str,\"concept_ids\":[str],\"new_insight\":str,\"connection\":str,\"relevance\":str,\"takeaway\":str}. Ergänze additional_basics:[str] mit höchstens fünf knappen Erklärungen fehlender Grundlagen. Bei leerem confirmed_knowledge erst notwendige Fachbegriffe verständlich definieren; kein unerklärter Fachjargon. Bereits bestätigte Grundlagen nicht unnötig wiederholen. Deutscher Titel, Kurzfassung ungefähr 60–120 Wörter. Nur Aussagen aus dem Abstract. Unsicherheiten und Analogien kennzeichnen, unbekannte Begriffe erklären. concept_ids ausschließlich aus confirmed_knowledge. Nur zu diesen IDs Vorwissen behaupten. Ohne passenden Bezug concept_ids=[] und connection=\"\"; fehlenden Bezug offen benennen und Grundlagen erklären. Keine erfundenen Experimente, Zahlen oder Fähigkeiten.", context)
         try {
             fun text(key: String, limit: Int = 6000): String = answer.get(key).asString.also { require(it.isNotBlank() && it.length <= limit) }
             val ids = answer.getAsJsonArray("concept_ids").map { it.asString }.distinct()
@@ -25,9 +25,11 @@ class LocalPersonalizer(private val knowledge: LocalKnowledgeRepository, private
             val current = knowledge.knowledge().filter { it.status == "confirmed" }.map { it.id }.toSet()
             require(ids.all { it in current })
             val connection = answer.get("connection").asString.also { require(it.length <= 6000 && (ids.isEmpty() == it.isBlank())) }
+            val basics = answer.get("additional_basics")?.takeUnless { it.isJsonNull }?.asJsonArray?.map { it.asString.also { value -> require(value.isNotBlank() && value.length <= 2000) } }
+            require(basics == null || basics.size <= 5)
             val summary = text("summary")
             return FeedItem(localId(), paper.id, text("title", 500), "Auf Grundlage des Abstracts: " + (if (ids.isEmpty()) "Kein direkter Wissensbezug gespeichert. " else "") + summary,
-                known.filter { it.id in ids }, text("new_insight"), connection, text("relevance"), text("takeaway"), true, paper.url, paper.published_at, paper.field)
+                known.filter { it.id in ids }, text("new_insight"), connection, text("relevance"), text("takeaway"), true, paper.url, paper.published_at, paper.field, basics)
         } catch (e: ConnectionFailure) { throw e }
         catch (_: Exception) { throw ConnectionFailure("llm_invalid_json") }
     }

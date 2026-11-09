@@ -22,7 +22,7 @@ class DirectModelClientTest {
         val (server, client) = secureServer()
         server.use {
             server.enqueue(MockResponse().setBody("{\"choices\":[{\"message\":{\"content\":\"{\\\"ok\\\":true}\"}}]}"))
-            val settings = Settings(directApiConsent = true, model = "fixture-model", llmBaseUrl = server.url("/v1").toString(), apiKey = "fixture-key")
+            val settings = Settings(credentialEpoch = 20261109, directApiConsent = true, model = "fixture-model", llmBaseUrl = server.url("/v1").toString(), apiKey = "fixture-key")
             val result = DirectModelClient(client).complete(settings, "Gib JSON zurück", JsonObject())
             assertTrue(result["ok"].asBoolean)
             val request = server.takeRequest()
@@ -31,10 +31,19 @@ class DirectModelClientTest {
             assertTrue(request.body.readUtf8().contains("fixture-model"))
         }
     }
+    @Test fun legacyCredentialsAreBlockedBeforeAnyRequest() = runBlocking {
+        MockWebServer().use { server ->
+            try {
+                DirectModelClient().complete(Settings(directApiConsent=true,model="fixture",apiKey="fixture-old",llmBaseUrl=server.url("/v1").newBuilder().scheme("https").build().toString()),"JSON",JsonObject())
+                fail("Legacy credentials must remain blocked")
+            } catch(e:ConnectionFailure) { assertEquals("key_rotation_required",e.code) }
+            assertEquals(0,server.requestCount)
+        }
+    }
     @Test fun plainHttpIsRejectedBeforeSendingKey() = runBlocking {
         MockWebServer().use { server ->
             try {
-                DirectModelClient().complete(Settings(directApiConsent = true, model = "fixture", apiKey = "fixture", llmBaseUrl = server.url("/v1").toString()), "JSON", JsonObject()); fail("HTTP must be rejected")
+                DirectModelClient().complete(Settings(credentialEpoch = 20261109, directApiConsent = true, model = "fixture", apiKey = "fixture", llmBaseUrl = server.url("/v1").toString()), "JSON", JsonObject()); fail("HTTP must be rejected")
             } catch (e: ConnectionFailure) { assertEquals("https_required", e.code) }
             assertEquals(0, server.requestCount)
         }
@@ -45,7 +54,7 @@ class DirectModelClientTest {
             for ((status, provider, expected) in listOf(Triple(401,"invalid_api_key","llm_invalid_key"), Triple(403,"permission","llm_forbidden"), Triple(429,"insufficient_quota","llm_insufficient_quota"), Triple(429,"rate_limit_exceeded","llm_rate_limit"), Triple(404,"model_not_found","llm_model_unavailable"), Triple(500,"failure","llm_server_error"))) {
                 server.enqueue(MockResponse().setResponseCode(status).setBody("{\"error\":{\"code\":\"$provider\",\"message\":\"PRIVATE_KEY_MUST_NOT_APPEAR\"}}"))
                 try {
-                    DirectModelClient(client).complete(Settings(directApiConsent = true, model = "fixture", apiKey = "fixture", llmBaseUrl = server.url("/v1").toString()), "JSON", JsonObject()); fail("Expected provider error")
+                    DirectModelClient(client).complete(Settings(credentialEpoch = 20261109, directApiConsent = true, model = "fixture", apiKey = "fixture", llmBaseUrl = server.url("/v1").toString()), "JSON", JsonObject()); fail("Expected provider error")
                 } catch (e: ConnectionFailure) { assertEquals(expected, e.code); assertFalse(FailureMessages.message(e.code).contains("PRIVATE_KEY")) }
             }
         }
