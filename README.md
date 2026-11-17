@@ -1,3 +1,5 @@
+(wurde mit helfe von T3 code, GPT 6 und Deepseek erstellt)
+
 # 🧠 PaperView
 
 ### Neue KI-Forschung. Erklärt mit deinem Wissen.
